@@ -362,20 +362,6 @@ export function StepViewer({
                   </p>
                 )}
               </div>
-
-              {/* Minimal Milestone Action */}
-              <button
-                onClick={onToggleComplete}
-                className={clsx(
-                  "flex items-center gap-2 px-4 py-2.5 rounded-md border text-xs font-mono tracking-wider uppercase transition-all duration-150 shrink-0",
-                  isCompleted 
-                    ? "bg-[#111111] border-[#14B8A6]/60 text-[#14B8A6] hover:bg-[#161616]" 
-                    : "bg-[#111111] border-[#242424] text-[#A1A1A1] hover:border-[#404040] hover:text-white"
-                )}
-              >
-                {isCompleted ? <CheckCircle2 size={16} /> : <Circle size={16} />}
-                <span>{isCompleted ? "Completed" : "Mark Complete"}</span>
-              </button>
             </div>
           </header>
 
@@ -809,14 +795,30 @@ export function StepViewer({
             </span>
           </div>
 
-          <button
-            onClick={onNext}
-            disabled={isLast}
-            className="flex items-center gap-2 text-xs font-medium bg-[#FF5722] hover:bg-[#E64A19] text-white disabled:opacity-30 disabled:hover:bg-[#FF5722] transition-colors px-5 py-2.5 rounded-md"
-          >
-            <span>{isLast ? "All Milestones Completed" : "Next Milestone"}</span>
-            <ChevronRight size={15} />
-          </button>
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Minimal Milestone Action */}
+            <button
+              onClick={onToggleComplete}
+              className={clsx(
+                "flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-md border text-xs font-mono tracking-wider uppercase transition-all duration-150 shrink-0",
+                isCompleted 
+                  ? "bg-[#111111] border-[#14B8A6]/60 text-[#14B8A6] hover:bg-[#161616]" 
+                  : "bg-[#111111] border-[#242424] text-[#A1A1A1] hover:border-[#404040] hover:text-white"
+              )}
+            >
+              {isCompleted ? <CheckCircle2 size={16} /> : <Circle size={16} />}
+              <span>{isCompleted ? "Completed" : "Mark Complete"}</span>
+            </button>
+
+            <button
+              onClick={onNext}
+              disabled={isLast}
+              className="flex items-center gap-2 text-xs font-medium bg-[#FF5722] hover:bg-[#E64A19] text-white disabled:opacity-30 disabled:hover:bg-[#FF5722] transition-colors px-4 sm:px-5 py-2 sm:py-2.5 rounded-md shrink-0"
+            >
+              <span>{isLast ? "All Milestones Completed" : "Next Milestone"}</span>
+              <ChevronRight size={15} />
+            </button>
+          </div>
         </div>
       </footer>
     </div>
