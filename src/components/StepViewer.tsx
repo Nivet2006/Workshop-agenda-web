@@ -176,6 +176,7 @@ interface StepViewerProps {
   completedTaskIds?: Set<string>;
   onToggleTask?: (taskId: string, current: boolean) => void;
   currentUser?: UserProfile | null;
+  fontScale?: number;
 }
 
 export function StepViewer({ 
@@ -190,7 +191,8 @@ export function StepViewer({
   searchQuery,
   completedTaskIds = new Set(),
   onToggleTask,
-  currentUser
+  currentUser,
+  fontScale = 1.0
 }: StepViewerProps) {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [submissionUrl, setSubmissionUrl] = useState('');
@@ -319,7 +321,10 @@ export function StepViewer({
     <div className="flex flex-col h-full w-full bg-[#0A0A0A]">
       {/* Editorial Content Area - Full width so scrollbar is at the right edge of the window */}
       <div className="flex-1 overflow-y-auto custom-scrollbar">
-        <div className="max-w-4xl lg:max-w-5xl mx-auto px-6 py-10 md:px-12 md:py-14 w-full">
+        <div 
+          className="max-w-4xl lg:max-w-5xl mx-auto px-6 py-10 md:px-12 md:py-14 w-full"
+          style={{ zoom: fontScale }}
+        >
         <motion.div
           key={step.id}
           initial={{ opacity: 0, y: 10 }}

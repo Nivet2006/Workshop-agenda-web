@@ -50,11 +50,22 @@ import {
   Compass, 
   LogOut,
   ChevronDown,
-  PanelLeft
+  PanelLeft,
+  Plus,
+  Minus
 } from 'lucide-react';
 import { clsx } from 'clsx';
 
 type AppViewMode = 'guide' | 'live-quiz' | 'organizer' | 'builder';
+
+export const FONT_SCALES = [
+  { scale: 0.85, label: '85%' },
+  { scale: 0.92, label: '92%' },
+  { scale: 1.0, label: '100%' },
+  { scale: 1.12, label: '112%' },
+  { scale: 1.25, label: '125%' },
+  { scale: 1.4, label: '140%' }
+];
 
 export default function App() {
   const [viewMode, setViewMode] = useState<AppViewMode>('guide');
@@ -62,6 +73,44 @@ export default function App() {
   const [sections, setSections] = useState<EventSection[]>(linkedinSections);
   const [steps, setSteps] = useState<EventStep[]>(linkedinSteps);
   const [currentStepId, setCurrentStepId] = useState<string>(linkedinSteps[0].id);
+
+  // Font Size Resizer State
+  const [fontScaleIndex, setFontScaleIndex] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('workshop_agenda_font_scale_idx');
+        if (saved !== null) {
+          const parsed = parseInt(saved, 10);
+          if (!isNaN(parsed) && parsed >= 0 && parsed < FONT_SCALES.length) {
+            return parsed;
+          }
+        }
+      } catch {
+        // Ignore localStorage error
+      }
+    }
+    return 2; // Default 100%
+  });
+
+  const handleDecreaseFont = () => {
+    setFontScaleIndex(prev => {
+      const next = Math.max(0, prev - 1);
+      try {
+        localStorage.setItem('workshop_agenda_font_scale_idx', String(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const handleIncreaseFont = () => {
+    setFontScaleIndex(prev => {
+      const next = Math.min(FONT_SCALES.length - 1, prev + 1);
+      try {
+        localStorage.setItem('workshop_agenda_font_scale_idx', String(next));
+      } catch {}
+      return next;
+    });
+  };
 
   // Search & Filtering
   const [searchQuery, setSearchQuery] = useState('');
@@ -339,12 +388,42 @@ export default function App() {
             )}
           </div>
 
-          {/* Right: Progress, Event Code Switcher, Profile & Fullscreen */}
-          <div className="flex items-center gap-3 shrink-0">
+          {/* Right: Progress, Font Controls, Event Code Switcher, Profile & Fullscreen */}
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             {/* Minimal Progress Indicator */}
             <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#111111] border border-[#242424]">
               <span className="text-[9px] font-mono text-[#666666] uppercase tracking-wider">PROGRESS</span>
               <span className="text-xs font-mono text-[#14B8A6] font-medium">{progressPercentage}%</span>
+            </div>
+
+            {/* Font Size Adjuster Controls (- and +) beside PROGRESS */}
+            <div 
+              className="flex items-center rounded-md bg-[#111111] border border-[#242424] p-0.5"
+              title="Adjust reading font size"
+            >
+              <button
+                type="button"
+                onClick={handleDecreaseFont}
+                disabled={fontScaleIndex <= 0}
+                className="w-6 h-6 flex items-center justify-center rounded text-[#A1A1A1] hover:text-white hover:bg-[#1A1A1A] disabled:opacity-25 disabled:hover:text-[#A1A1A1] disabled:hover:bg-transparent transition-colors"
+                aria-label="Decrease font size"
+                title="Decrease font size (-)"
+              >
+                <Minus size={13} strokeWidth={2.2} />
+              </button>
+              <span className="px-1 text-[10px] font-mono text-[#737373] select-none min-w-[34px] text-center font-medium">
+                {FONT_SCALES[fontScaleIndex].label}
+              </span>
+              <button
+                type="button"
+                onClick={handleIncreaseFont}
+                disabled={fontScaleIndex >= FONT_SCALES.length - 1}
+                className="w-6 h-6 flex items-center justify-center rounded text-[#A1A1A1] hover:text-white hover:bg-[#1A1A1A] disabled:opacity-25 disabled:hover:text-[#A1A1A1] disabled:hover:bg-transparent transition-colors"
+                aria-label="Increase font size"
+                title="Increase font size (+)"
+              >
+                <Plus size={13} strokeWidth={2.2} />
+              </button>
             </div>
 
             {/* Hidden for now: Event Access Code Badge (LINKEDIN) */}
@@ -447,6 +526,7 @@ export default function App() {
               completedTaskIds={completedTaskIds}
               onToggleTask={toggleTask}
               currentUser={currentUser}
+              fontScale={FONT_SCALES[fontScaleIndex].scale}
             />
           )}
 
