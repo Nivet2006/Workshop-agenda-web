@@ -24,8 +24,9 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { EmbeddedQuiz } from '../features/quizzes/EmbeddedQuiz';
-import { saveStepProgress, getStepProgress, saveDedicatedSubmission, getUserSubmissions } from '../lib/supabase';
-import { saveDbSubmission } from '../lib/dbService';
+import { saveStepProgress, getStepProgress, saveDedicatedSubmission, getUserSubmissions, getPersistentGuestId } from '../lib/supabase';
+import { saveDbSubmission, fetchDbSubmissions } from '../lib/dbService';
+import { SpeakerNetworking } from './SpeakerNetworking';
 
 // -----------------------------------------------------------------------------
 // Real-Time Local Browser Validation & Diagnostics for LinkedIn URLs
@@ -205,32 +206,75 @@ export function StepViewer({
     return analyzeLinkedInUrl(submissionUrl, step.content?.submissionKey, step.position);
   }, [submissionUrl, step.content?.submissionKey, step.position]);
 
+  const isUrlSubmissionStep = Boolean(
+    step.content?.submissionType === 'url' || 
+    [2, 10, 11].includes(step.position) ||
+    ['li-step-02', 'li-step-10', 'li-step-11'].includes(step.id)
+  );
+
+  const isNetworkingStep = Boolean(
+    step.id === 'li-step-12' || step.title.toLowerCase().includes('networking')
+  );
+
   // Load existing submission for this step separately
   useEffect(() => {
-    const userId = currentUser?.id || 'guest-user';
-    getStepProgress(userId, step.id).then(progress => {
-      const submissions = getUserSubmissions(userId, step.eventId);
-      const stepKey = step.content?.submissionKey || (
-        step.position === 2 ? 'custom_profile_url' :
-        step.position === 10 ? 'published_post_url' :
-        step.position === 11 ? 'final_profile_url' : null
-      );
-      
+    let isMounted = true;
+    const effectiveUserId = currentUser?.id || getPersistentGuestId();
+    const stepKey = step.content?.submissionKey || (
+      step.position === 2 ? 'custom_profile_url' :
+      step.position === 10 ? 'published_post_url' :
+      step.position === 11 ? 'final_profile_url' : null
+    );
+
+    async function loadData() {
+      const progress = await getStepProgress(effectiveUserId, step.id);
+      const submissions = getUserSubmissions(effectiveUserId, step.eventId);
+
       const dedicatedSaved = stepKey === 'custom_profile_url' ? submissions?.customProfileUrl :
                              stepKey === 'published_post_url' ? submissions?.publishedPostUrl :
                              stepKey === 'final_profile_url' ? submissions?.finalProfileUrl : null;
 
-      const loadedUrl = progress?.completionData?.submissionUrl || 
-                        (stepKey ? progress?.completionData?.[stepKey] : null) || 
-                        dedicatedSaved?.url || '';
+      let loadedUrl = progress?.completionData?.submissionUrl || 
+                      (stepKey ? progress?.completionData?.[stepKey] : null) || 
+                      dedicatedSaved?.url || '';
 
-      const loadedTimestamp = progress?.completionData?.submittedAt || dedicatedSaved?.submittedAt || null;
+      let loadedTimestamp = progress?.completionData?.submittedAt || dedicatedSaved?.submittedAt || null;
 
-      setSubmissionUrl(loadedUrl);
-      setSubmittedAt(loadedTimestamp);
-      setSubmissionStatus('idle');
-    });
-  }, [step.id, step.position, step.eventId, currentUser?.id]);
+      // If still not found, check db/submissions.json directly
+      if (!loadedUrl && (stepKey || isUrlSubmissionStep)) {
+        try {
+          const dbSubs = await fetchDbSubmissions();
+          const match = dbSubs.find(s => 
+            s.eventId === step.eventId && 
+            (s.key === stepKey || s.stepNumber === step.position) &&
+            (s.userId === effectiveUserId || s.userId === 'guest-user')
+          ) || dbSubs.find(s => 
+            s.eventId === step.eventId && 
+            (s.key === stepKey || s.stepNumber === step.position)
+          );
+
+          if (match && match.url) {
+            loadedUrl = match.url;
+            loadedTimestamp = match.submittedAt || null;
+          }
+        } catch (e) {
+          console.warn('Error loading from db submissions:', e);
+        }
+      }
+
+      if (isMounted) {
+        setSubmissionUrl(loadedUrl);
+        setSubmittedAt(loadedTimestamp);
+        setSubmissionStatus('idle');
+      }
+    }
+
+    loadData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [step.id, step.position, step.eventId, currentUser?.id, isUrlSubmissionStep]);
 
   const copyToClipboard = (text: string, fieldId: string) => {
     navigator.clipboard.writeText(text);
@@ -238,8 +282,8 @@ export function StepViewer({
     setTimeout(() => setCopiedField(null), 2200);
   };
 
-  const handleSaveSubmission = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSaveSubmission = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     const raw = submissionUrl.trim();
     if (!raw) return;
 
@@ -248,7 +292,7 @@ export function StepViewer({
     setSubmissionUrl(cleanUrl);
 
     setSubmissionStatus('saving');
-    const userId = currentUser?.id || 'guest-user';
+    const effectiveUserId = currentUser?.id || getPersistentGuestId();
     const timestamp = new Date().toISOString();
     
     // Determine submission key and dedicated field based on step
@@ -264,11 +308,17 @@ export function StepViewer({
       step.position === 11 ? 'final_profile_review_url' : 'generic_url'
     );
 
+    const submissionLabel = step.content?.submissionLabel || (
+      step.position === 2 ? 'Test & Verify: Paste your custom profile URL below' :
+      step.position === 10 ? 'Submit Your Published LinkedIn Post URL' :
+      step.position === 11 ? 'Submit Your Final Profile URL for Review' : 'Submit URL'
+    );
+
     const completionPayload: Record<string, any> = {
-      submissionUrl: submissionUrl.trim(),
+      submissionUrl: cleanUrl,
       submissionKey,
       submissionCategory,
-      submissionLabel: step.content?.submissionLabel || 'Submit URL',
+      submissionLabel,
       stepNumber: step.position,
       stepTitle: step.title,
       stepId: step.id,
@@ -276,50 +326,68 @@ export function StepViewer({
     };
 
     if (submissionKey === 'custom_profile_url') {
-      completionPayload.customProfileUrl = submissionUrl.trim();
+      completionPayload.customProfileUrl = cleanUrl;
     } else if (submissionKey === 'published_post_url') {
-      completionPayload.publishedPostUrl = submissionUrl.trim();
+      completionPayload.publishedPostUrl = cleanUrl;
     } else if (submissionKey === 'final_profile_url') {
-      completionPayload.finalProfileUrl = submissionUrl.trim();
+      completionPayload.finalProfileUrl = cleanUrl;
     }
 
-    // 1. Save step progress with distinct completion data
-    await saveStepProgress(
-      userId,
-      step.eventId,
-      step.id,
-      isCompleted ? 'completed' : 'in_progress',
-      completionPayload
-    );
+    try {
+      // 1. Save step progress with distinct completion data
+      await saveStepProgress(
+        effectiveUserId,
+        step.eventId,
+        step.id,
+        isCompleted ? 'completed' : 'in_progress',
+        completionPayload
+      );
 
-    // 2. Save dedicated separate submission record
-    await saveDedicatedSubmission(
-      userId,
-      step.eventId,
-      submissionKey,
-      cleanUrl,
-      step.id,
-      step.position,
-      step.content?.submissionLabel || 'Submit URL'
-    );
+      // 2. Save dedicated separate submission record
+      await saveDedicatedSubmission(
+        effectiveUserId,
+        step.eventId,
+        submissionKey,
+        cleanUrl,
+        step.id,
+        step.position,
+        submissionLabel
+      );
 
-    // 3. Persist to ./db/submissions.json database
-    await saveDbSubmission({
-      userId,
-      userName: currentUser?.displayName || 'Workshop Participant',
-      userEmail: currentUser?.email || '',
-      eventId: step.eventId,
-      key: submissionKey,
-      label: step.content?.submissionLabel || 'Submit URL',
-      stepNumber: step.position,
-      stepTitle: step.title,
-      url: cleanUrl,
-      handle: urlAnalysis?.handle || ''
-    });
+      // 3. Persist to ./db/submissions.json database
+      await saveDbSubmission({
+        userId: effectiveUserId,
+        userName: currentUser?.displayName || 'Workshop Participant',
+        userEmail: currentUser?.email || '',
+        eventId: step.eventId,
+        eventTitle: 'LinkedIn Profile Building',
+        key: submissionKey,
+        label: submissionLabel,
+        stepNumber: step.position,
+        stepTitle: step.title,
+        url: cleanUrl,
+        handle: urlAnalysis?.handle || ''
+      });
 
-    setSubmittedAt(timestamp);
-    setSubmissionStatus('saved');
-    setTimeout(() => setSubmissionStatus('idle'), 3000);
+      setSubmittedAt(timestamp);
+      setSubmissionStatus('saved');
+      setTimeout(() => setSubmissionStatus('idle'), 3000);
+
+      // If user explicitly clicked submit in the form and milestone isn't marked completed, auto-mark complete
+      if (e && !isCompleted) {
+        onToggleComplete();
+      }
+    } catch (err) {
+      console.error('Failed to save submission:', err);
+      setSubmissionStatus('idle');
+    }
+  };
+
+  const handleToggleComplete = async () => {
+    if (isUrlSubmissionStep && submissionUrl.trim()) {
+      await handleSaveSubmission();
+    }
+    onToggleComplete();
   };
 
   // Highlight search terms in content
@@ -356,7 +424,7 @@ export function StepViewer({
                 <h1 className="font-serif text-4xl sm:text-5xl md:text-6xl text-white tracking-tight leading-[1.08] font-normal">
                   {step.title.replace(/^Step\s*\d+\s*[—–-]\s*/i, '')}
                 </h1>
-                {step.summary && (
+                {step.summary && !isNetworkingStep && (
                   <p className="mt-3 text-base md:text-lg text-[#A1A1A1] font-normal leading-relaxed max-w-2xl font-sans">
                     {step.summary}
                   </p>
@@ -366,7 +434,7 @@ export function StepViewer({
           </header>
 
           {/* Objective Banner */}
-          {step.objective && (
+          {step.objective && !isNetworkingStep && (
             <div className="mb-8 p-5 rounded-md bg-[#111111] border border-[#242424] flex items-start gap-4">
               <span className="text-[10px] font-mono uppercase tracking-widest text-[#C5A059] border border-[#242424] px-2 py-0.5 rounded-[4px] shrink-0 mt-0.5">
                 OBJECTIVE
@@ -378,7 +446,7 @@ export function StepViewer({
           )}
 
           {/* HTML Instructions Body */}
-          {highlightedContent && (
+          {highlightedContent && !isNetworkingStep && (
             <article 
               className="prose prose-invert prose-base md:prose-lg max-w-none prose-headings:font-serif prose-headings:font-normal prose-h4:text-xl prose-p:text-[#A1A1A1] prose-strong:text-white prose-li:text-[#A1A1A1] prose-code:text-[#C5A059] prose-code:font-mono prose-code:bg-[#111111] prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-[4px] prose-code:border prose-code:border-[#242424] mb-8"
               dangerouslySetInnerHTML={{ __html: highlightedContent }}
@@ -585,13 +653,13 @@ export function StepViewer({
           )}
 
           {/* URL Submission Box (Steps 2, 10, 11) */}
-          {step.content?.submissionType === 'url' && (
+          {isUrlSubmissionStep && (
             <div className="my-8 p-6 rounded-md bg-[#111111] border border-[#242424] space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-[#1B1B1B]">
                 <div>
                   <h4 className="font-mono text-xs uppercase tracking-widest text-white flex items-center gap-2">
                     <Link2 size={14} className="text-[#FF5722]" />
-                    {step.content.submissionLabel || 'Submit Your URL'}
+                    {step.content?.submissionLabel || 'Submit Your URL'}
                   </h4>
                   <p className="text-xs text-[#666666] mt-0.5 font-sans">
                     Private verification link for mentors and organizers
@@ -610,7 +678,7 @@ export function StepViewer({
                       type="text"
                       value={submissionUrl}
                       onChange={(e) => setSubmissionUrl(e.target.value)}
-                      placeholder={step.content.submissionPlaceholder || 'https://www.linkedin.com/...'}
+                      placeholder={step.content?.submissionPlaceholder || 'https://www.linkedin.com/...'}
                       className={clsx(
                         "w-full px-4 py-2.5 bg-[#0A0A0A] border rounded-md text-xs font-mono text-white placeholder-[#666666] focus:outline-none transition-colors",
                         urlAnalysis?.status === 'success' ? "border-[#14B8A6] focus:border-[#14B8A6]" :
@@ -696,8 +764,13 @@ export function StepViewer({
             </div>
           )}
 
+          {/* Speaker Networking with QR Codes (Step 12 / Networking) */}
+          {(step.id === 'li-step-12' || step.title.toLowerCase().includes('networking')) && (
+            <SpeakerNetworking />
+          )}
+
           {/* Action Checklist Tasks */}
-          {step.tasks && step.tasks.length > 0 && (
+          {step.tasks && step.tasks.length > 0 && !isNetworkingStep && (
             <div className="my-8 p-6 rounded-md bg-[#111111] border border-[#242424] space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-[#242424]">
                 <div className="flex items-center gap-2">
@@ -738,7 +811,7 @@ export function StepViewer({
           )}
 
           {/* Step Resources List */}
-          {step.resources && step.resources.length > 0 && (
+          {step.resources && step.resources.length > 0 && !isNetworkingStep && (
             <div className="my-6 p-4 rounded-md bg-[#111111] border border-[#242424]">
               <span className="text-[10px] font-mono uppercase tracking-widest text-[#666666] block mb-2">
                 Official Step Resources:
@@ -798,7 +871,7 @@ export function StepViewer({
           <div className="flex items-center gap-2 sm:gap-3">
             {/* Minimal Milestone Action */}
             <button
-              onClick={onToggleComplete}
+              onClick={handleToggleComplete}
               className={clsx(
                 "flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-md border text-xs font-mono tracking-wider uppercase transition-all duration-150 shrink-0",
                 isCompleted 

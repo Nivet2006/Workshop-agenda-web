@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import { supabase } from './supabase';
 
 export interface StoredSubmission {
   id: string;
@@ -32,110 +33,73 @@ export const isFakeSeedRecord = (item: Partial<StoredSubmission>): boolean => {
   );
 };
 
-let hasInitialSyncRun = false;
-
-export async function syncStoredSubmissionsToDb(): Promise<void> {
-  if (hasInitialSyncRun) return;
-  hasInitialSyncRun = true;
-
-  if (typeof localStorage === 'undefined') return;
-
-  try {
-    const rawUserSubs = localStorage.getItem('eventflow_user_submissions');
-    if (!rawUserSubs) return;
-    const records: Record<string, any> = JSON.parse(rawUserSubs);
-
-    // Fetch existing records from server to avoid re-saving
-    let existingList: StoredSubmission[] = [];
-    try {
-      const res = await fetch('/api/db/submissions');
-      if (res.ok) {
-        existingList = await res.json();
-      }
-    } catch {}
-
-    // Get current profile name/email if set
-    let userName = 'Workshop Participant';
-    let userEmail = '';
-    try {
-      const rawProfile = localStorage.getItem('eventflow_user_profile');
-      if (rawProfile) {
-        const p = JSON.parse(rawProfile);
-        if (p.displayName) userName = p.displayName;
-        if (p.email) userEmail = p.email;
-      }
-    } catch {}
-
-    for (const [, record] of Object.entries(records)) {
-      if (!record || typeof record !== 'object') continue;
-      const eventId = record.eventId || 'e0000000-0000-0000-0000-000000000002';
-      const userId = record.userId || 'guest-user';
-
-      const itemsToSync = [
-        record.customProfileUrl,
-        record.publishedPostUrl,
-        record.finalProfileUrl
-      ].filter(Boolean);
-
-      for (const item of itemsToSync) {
-        if (!item || !item.url || isFakeSeedRecord(item)) continue;
-        
-        // Skip if already in existingList
-        const alreadyExists = existingList.some(
-          ex => ex.key === item.key && ex.userId === userId && ex.url === item.url
-        );
-        if (alreadyExists) continue;
-
-        await saveDbSubmission({
-          userId,
-          userName,
-          userEmail,
-          eventId,
-          key: item.key,
-          label: item.label || 'Submit URL',
-          stepNumber: item.stepNumber,
-          stepTitle: item.stepNumber === 2 ? 'Custom Profile URL Configuration' : 
-                     item.stepNumber === 10 ? 'Publish Live Event Post' : 
-                     item.stepNumber === 11 ? 'Submit Final Profile for Review' : 'Milestone Submission',
-          url: item.url,
-          handle: item.url.split('/in/')[1]?.split(/[?/#]/)[0] || item.url.split('/posts/')[1]?.split(/[?/#]/)[0] || ''
-        }, false);
-      }
-    }
-  } catch (err) {
-    console.error('Error syncing local user submissions to db:', err);
-  }
-}
-
 export async function fetchDbSubmissions(): Promise<StoredSubmission[]> {
-  // Sync once if not already run
-  if (!hasInitialSyncRun) {
-    await syncStoredSubmissionsToDb();
-  }
+  // Query Supabase directly
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('submissions')
+        .select('*')
+        .order('submitted_at', { ascending: false });
 
-  try {
-    const res = await fetch('/api/db/submissions');
-    if (res.ok) {
-      const data: StoredSubmission[] = await res.json();
-      if (Array.isArray(data)) {
-        // Strip out any fake seed records
-        const cleanData = data.filter(s => !isFakeSeedRecord(s));
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanData));
-        return cleanData;
+      if (!error && Array.isArray(data)) {
+        const mapped: StoredSubmission[] = data.map((d: any) => ({
+          id: d.id,
+          userId: d.user_id,
+          userName: d.user_name || 'Workshop Participant',
+          userEmail: d.user_email || '',
+          eventId: d.event_id,
+          eventTitle: d.event_title || 'LinkedIn Profile Building',
+          key: d.key,
+          label: d.label,
+          stepNumber: d.step_number,
+          stepTitle: d.step_title,
+          url: d.url,
+          handle: d.handle || '',
+          status: (d.status as any) || 'valid',
+          submittedAt: d.submitted_at || new Date().toISOString()
+        })).filter(s => !isFakeSeedRecord(s));
+
+        // Deduplicate: Keep only the most recent submission per user + event + stepNumber
+        const seen = new Set<string>();
+        const uniqueList: StoredSubmission[] = [];
+        for (const item of mapped) {
+          const dedupeKey = `${item.userId}_${item.eventId}_${item.stepNumber}`;
+          if (!seen.has(dedupeKey)) {
+            seen.add(dedupeKey);
+            uniqueList.push(item);
+          }
+        }
+
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(uniqueList));
+        } catch {}
+
+        return uniqueList;
+      } else if (error) {
+        console.warn('Supabase fetch error, checking cache:', error.message);
       }
+    } catch (err) {
+      console.warn('Supabase network error, fallback to cache:', err);
     }
-  } catch (err) {
-    console.warn('API /api/db/submissions unavailable, reading from local cache:', err);
   }
 
-  // Fallback to local storage (filtering out fake seed data)
+  // Fallback to local storage cache if offline
   try {
     const cached = localStorage.getItem(STORAGE_KEY);
     if (cached) {
       const parsed: StoredSubmission[] = JSON.parse(cached);
       const clean = Array.isArray(parsed) ? parsed.filter(s => !isFakeSeedRecord(s)) : [];
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
-      return clean;
+      const seen = new Set<string>();
+      const uniqueList: StoredSubmission[] = [];
+      for (const item of clean) {
+        const dedupeKey = `${item.userId}_${item.eventId}_${item.stepNumber}`;
+        if (!seen.has(dedupeKey)) {
+          seen.add(dedupeKey);
+          uniqueList.push(item);
+        }
+      }
+      return uniqueList;
     }
   } catch (e) {
     console.error('Failed reading localStorage submissions:', e);
@@ -158,7 +122,8 @@ export async function saveDbSubmission(payload: {
   handle?: string;
 }, dispatchEvent = true): Promise<StoredSubmission> {
   const timestamp = new Date().toISOString();
-  const id = `sub_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  // Deterministic ID per user, event, and step so re-submissions update the same row
+  const id = `sub_${payload.userId.replace(/[^a-zA-Z0-9_-]/g, '')}_s${payload.stepNumber}`;
   
   const record: StoredSubmission = {
     id,
@@ -177,57 +142,70 @@ export async function saveDbSubmission(payload: {
     submittedAt: timestamp
   };
 
-  try {
-    const res = await fetch('/api/db/submissions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(record)
-    });
-    if (res.ok) {
-      const json = await res.json();
-      if (json.record) {
-        // Update local storage cache directly without recursive network calls
-        try {
-          const raw = localStorage.getItem(STORAGE_KEY);
-          const current: StoredSubmission[] = raw ? JSON.parse(raw) : [];
-          const exists = current.findIndex(c => c.id === record.id || (c.userId === record.userId && c.key === record.key && c.eventId === record.eventId));
-          if (exists >= 0) {
-            current[exists] = record;
-          } else {
-            current.unshift(record);
-          }
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
-        } catch {}
-      }
-    }
-  } catch (err) {
-    console.warn('Failed saving to API /api/db/submissions, persisting locally:', err);
+  // Direct and Instant Supabase DB write with onConflict on unique user + event + step
+  if (supabase) {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      const current: StoredSubmission[] = raw ? JSON.parse(raw) : [];
-      current.unshift(record);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
-    } catch {}
+      const { error } = await supabase
+        .from('submissions')
+        .upsert({
+          id: record.id,
+          user_id: record.userId,
+          user_name: record.userName,
+          user_email: record.userEmail,
+          event_id: record.eventId,
+          event_title: record.eventTitle,
+          key: record.key,
+          label: record.label,
+          step_number: record.stepNumber,
+          step_title: record.stepTitle,
+          url: record.url,
+          handle: record.handle,
+          status: record.status,
+          submitted_at: record.submittedAt
+        }, { onConflict: 'user_id,event_id,step_number' });
+
+      if (error) {
+        console.error('Direct Supabase write error:', error);
+      }
+    } catch (err) {
+      console.error('Direct Supabase exception:', err);
+    }
   }
+
+  // Update local cache for instant UI response (strictly 1 entry per step)
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const current: StoredSubmission[] = raw ? JSON.parse(raw) : [];
+    const exists = current.findIndex(c => 
+      c.id === record.id || 
+      (c.userId === record.userId && c.stepNumber === record.stepNumber && c.eventId === record.eventId)
+    );
+    if (exists >= 0) {
+      current[exists] = record;
+    } else {
+      current.unshift(record);
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
+  } catch {}
 
   if (dispatchEvent) {
     window.dispatchEvent(new CustomEvent('workshop_db_updated', { detail: { record } }));
+    window.dispatchEvent(new CustomEvent('eventflow_submission_saved', { detail: { record } }));
   }
   return record;
 }
 
 export async function deleteDbSubmission(id: string): Promise<boolean> {
-  try {
-    const res = await fetch(`/api/db/submissions?id=${encodeURIComponent(id)}`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids: [id] })
-    });
-    if (!res.ok) {
-      console.warn('API delete error, falling back locally');
+  // Direct Supabase delete
+  if (supabase) {
+    try {
+      const { error } = await supabase.from('submissions').delete().eq('id', id);
+      if (error) {
+        console.error('Direct Supabase delete error:', error);
+      }
+    } catch (err) {
+      console.error('Direct Supabase delete exception:', err);
     }
-  } catch (err) {
-    console.warn('Network error during submission delete:', err);
   }
 
   // Update local storage cache
@@ -248,18 +226,17 @@ export async function deleteDbSubmission(id: string): Promise<boolean> {
 
 export async function deleteDbSubmissionsGroup(ids: string[]): Promise<number> {
   if (!ids || ids.length === 0) return 0;
-  
-  try {
-    const res = await fetch('/api/db/submissions', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids })
-    });
-    if (!res.ok) {
-      console.warn('API group delete error, falling back locally');
+
+  // Direct Supabase group delete
+  if (supabase) {
+    try {
+      const { error } = await supabase.from('submissions').delete().in('id', ids);
+      if (error) {
+        console.error('Direct Supabase group delete error:', error);
+      }
+    } catch (err) {
+      console.error('Direct Supabase group delete exception:', err);
     }
-  } catch (err) {
-    console.warn('Network error during group delete:', err);
   }
 
   // Update local storage cache

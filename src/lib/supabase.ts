@@ -427,7 +427,15 @@ export async function getEventSections(eventId: string): Promise<EventSection[]>
   }
 
   const sections = getLocalItem<EventSection[]>(LOCAL_STORAGE_KEYS.SECTIONS, allSeedSections);
-  return sections.filter(s => s.eventId === eventId);
+  const filtered = sections.filter(s => s.eventId === eventId);
+  const seedForEvent = allSeedSections.filter(s => s.eventId === eventId);
+  if (filtered.length < seedForEvent.length || !filtered.some(s => s.id === 'sec-li-5')) {
+    const missing = seedForEvent.filter(s => !filtered.some(f => f.id === s.id));
+    const merged = [...filtered, ...missing].sort((a, b) => a.position - b.position);
+    setLocalItem(LOCAL_STORAGE_KEYS.SECTIONS, [...sections.filter(s => s.eventId !== eventId), ...merged]);
+    return merged;
+  }
+  return filtered;
 }
 
 export async function getEventSteps(eventId: string): Promise<EventStep[]> {
@@ -480,7 +488,15 @@ export async function getEventSteps(eventId: string): Promise<EventStep[]> {
   }
 
   const steps = getLocalItem<EventStep[]>(LOCAL_STORAGE_KEYS.STEPS, allSeedSteps);
-  return steps.filter(s => s.eventId === eventId);
+  const filtered = steps.filter(s => s.eventId === eventId);
+  const seedStepsForEvent = allSeedSteps.filter(s => s.eventId === eventId);
+  if (filtered.length < seedStepsForEvent.length || !filtered.some(s => s.id === 'li-step-12')) {
+    const missing = seedStepsForEvent.filter(s => !filtered.some(f => f.id === s.id));
+    const merged = [...filtered, ...missing].sort((a, b) => a.position - b.position);
+    setLocalItem(LOCAL_STORAGE_KEYS.STEPS, [...steps.filter(s => s.eventId !== eventId), ...merged]);
+    return merged;
+  }
+  return filtered;
 }
 
 export async function saveEventStep(step: EventStep): Promise<void> {

@@ -25,6 +25,7 @@ import {
   deleteDbSubmissionsGroup, 
   exportSubmissionsToXLSX 
 } from '../../lib/dbService';
+import { supabase } from '../../lib/supabase';
 
 interface SubmissionsDatabaseModalProps {
   isOpen: boolean;
@@ -86,10 +87,28 @@ export function SubmissionsDatabaseModal({
 
     window.addEventListener('workshop_db_updated', handleUpdate);
     window.addEventListener('eventflow_submission_saved', handleUpdate);
+
+    let channel: any;
+    if (supabase) {
+      try {
+        channel = supabase
+          .channel('realtime:submissions')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'submissions' }, () => {
+            handleUpdate();
+          })
+          .subscribe();
+      } catch (err) {
+        console.warn('Realtime subscription error:', err);
+      }
+    }
+
     return () => {
       clearTimeout(timer);
       window.removeEventListener('workshop_db_updated', handleUpdate);
       window.removeEventListener('eventflow_submission_saved', handleUpdate);
+      if (channel && supabase) {
+        supabase.removeChannel(channel);
+      }
     };
   }, [isOpen]);
 

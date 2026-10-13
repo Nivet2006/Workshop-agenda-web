@@ -684,6 +684,14 @@ export const linkedinSections: EventSection[] = [
     description: 'Live event post publishing, profile submission, and peer networking',
     position: 4,
     visibility: 'visible'
+  },
+  {
+    id: 'sec-li-5',
+    eventId: LINKEDIN_EVENT_ID,
+    title: 'Networking',
+    description: 'Connect directly with event speakers and instructors via LinkedIn QR codes',
+    position: 5,
+    visibility: 'visible'
   }
 ];
 
@@ -1340,6 +1348,39 @@ Huge thanks to the organizers and mentors for hosting such an impactful session!
       { id: 'li-t11-2', stepId: 'li-step-11', title: 'Send personalized connection requests to at least 3-5 workshop peers', position: 2, required: true },
       { id: 'li-t11-3', stepId: 'li-step-11', title: 'Follow official One Percent Club and industry leaders', position: 3, required: true },
       { id: 'li-t11-4', stepId: 'li-step-11', title: 'Confirm completion of all 11 workshop milestones', position: 4, required: true }
+    ]
+  },
+
+  // Step 12 - Networking with Speakers
+  {
+    id: 'li-step-12',
+    eventId: LINKEDIN_EVENT_ID,
+    sectionId: 'sec-li-5',
+    type: 'resource_collection',
+    title: 'Networking',
+    timeRange: '3:30 – 3:45',
+    durationMinutes: 15,
+    position: 12,
+    required: false,
+    completionRule: 'manual',
+    publishedVersion: 1,
+    summary: 'Connect with workshop speakers Nived Shaji and Nithesh V on LinkedIn',
+    objective: 'Scan QR codes to connect with workshop speakers Nived Shaji and Nithesh V on LinkedIn.',
+    content: {
+      html: `
+        <p class="mb-4 text-base">Congratulations on finishing all workshop milestones!</p>
+        <p class="mb-4 text-sm text-zinc-300">The final component of today's session is direct networking. Connect with today's speakers and mentors below to keep in touch for career mentorship, code reviews, and upcoming engineering workshops.</p>
+      `
+    },
+    tasks: [
+      { id: 'li-t12-1', stepId: 'li-step-12', title: 'Scan or open Nived Shaji\'s LinkedIn profile', position: 1, required: true },
+      { id: 'li-t12-2', stepId: 'li-step-12', title: 'Send a personalized connection request to Nived Shaji', position: 2, required: true },
+      { id: 'li-t12-3', stepId: 'li-step-12', title: 'Scan or open Nithesh V\'s LinkedIn profile', position: 3, required: true },
+      { id: 'li-t12-4', stepId: 'li-step-12', title: 'Send a personalized connection request to Nithesh V', position: 4, required: true }
+    ],
+    resources: [
+      { id: 'res-sp-1', stepId: 'li-step-12', label: 'Nived Shaji (linkedin.com/in/nivet2006)', type: 'link', url: 'https://www.linkedin.com/in/nivet2006/', position: 1 },
+      { id: 'res-sp-2', stepId: 'li-step-12', label: 'Nithesh V (linkedin.com/in/nitheshvinod)', type: 'link', url: 'https://www.linkedin.com/in/nitheshvinod/', position: 2 }
     ]
   }
 ];

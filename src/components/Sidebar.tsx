@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { CheckCircle2, Circle, Clock, Search, X, Layers, Sparkles, CheckSquare, Coffee, HelpCircle, ChevronRight } from 'lucide-react';
+import { CheckCircle2, Circle, Clock, Search, X, Layers, Sparkles, CheckSquare, Coffee, HelpCircle, ChevronRight, QrCode } from 'lucide-react';
 import { EventStep, EventSection, StepType } from '../types';
 import { clsx } from 'clsx';
 
@@ -176,10 +176,15 @@ export function Sidebar({
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className={clsx(
-                            "text-xs leading-snug truncate",
+                            "text-xs leading-snug truncate flex items-center justify-between gap-1",
                             isActive ? "font-medium text-white" : "text-[#A1A1A1] group-hover:text-white"
                           )}>
-                            {step.title.replace(/^Step\s*\d+\s*[—–-]\s*/i, '')}
+                            <span className="truncate">{step.title.replace(/^Step\s*\d+\s*[—–-]\s*/i, '')}</span>
+                            {step.title.toLowerCase().includes('networking') && (
+                              <span className="text-[9px] font-mono font-bold text-[#FF5722] bg-[#FF5722]/10 border border-[#FF5722]/20 px-1.5 py-0.5 rounded shrink-0">
+                                QR
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -188,6 +193,41 @@ export function Sidebar({
                 );
               })
             )}
+          </div>
+
+          {/* Dedicated Networking Option */}
+          <div className="p-3 border-t border-[#1C1C1C] bg-[#0C0C0C]">
+            <button
+              onClick={() => {
+                const netStep = allSteps.find(s => s.id === 'li-step-12' || s.title.toLowerCase().includes('networking'));
+                if (netStep) {
+                  onSelectStep(netStep.id);
+                  onClose();
+                }
+              }}
+              className={clsx(
+                "w-full flex items-center justify-between px-3 py-2 rounded-lg border text-xs transition-all duration-150 group",
+                currentStepId === 'li-step-12'
+                  ? "bg-[#FF5722]/15 border-[#FF5722] text-white shadow-lg shadow-[#FF5722]/10"
+                  : "bg-[#141414] border-[#242424] text-[#D4D4D4] hover:border-[#FF5722]/60 hover:text-white"
+              )}
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 rounded-md bg-[#FF5722]/10 text-[#FF5722] group-hover:bg-[#FF5722]/20 transition-colors">
+                  <QrCode size={15} />
+                </div>
+                <div className="text-left">
+                  <div className="font-semibold tracking-wide text-white text-xs flex items-center gap-1.5">
+                    <span>Networking</span>
+                    <span className="text-[9px] font-mono text-[#14B8A6] bg-[#14B8A6]/10 border border-[#14B8A6]/20 px-1 py-0.2 rounded">
+                      SPEAKERS
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-[#888888] font-mono">Speaker QR Codes</div>
+                </div>
+              </div>
+              <ChevronRight size={14} className="text-[#666666] group-hover:text-white transition-colors" />
+            </button>
           </div>
 
           {/* Footer */}

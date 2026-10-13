@@ -141,11 +141,11 @@ test('LinkedIn Profile Building Workshop Seed Integrity', async () => {
   // Event verification
   assert.equal(linkedinEvent.accessCode, 'LINKEDIN');
   assert.equal(linkedinEvent.title, 'LinkedIn Profile Building Workshop');
-  assert.equal(linkedinSections.length, 4);
+  assert.equal(linkedinSections.length, 5);
 
-  // 11 steps verification
-  assert.equal(linkedinSteps.length, 11);
-  for (let i = 0; i < 11; i++) {
+  // 12 steps verification
+  assert.equal(linkedinSteps.length, 12);
+  for (let i = 0; i < 12; i++) {
     const step = linkedinSteps[i];
     assert.equal(step.position, i + 1);
     assert.ok(step.title.length > 0, `Step ${i + 1} must have a title`);
@@ -169,6 +169,13 @@ test('LinkedIn Profile Building Workshop Seed Integrity', async () => {
   const step11 = linkedinSteps[10];
   assert.equal(step11.content.submissionType, 'url');
   assert.ok(step11.content.submissionLabel && step11.content.submissionLabel.includes('Profile URL'));
+
+  // Step 12 networking verification
+  const step12 = linkedinSteps[11];
+  assert.equal(step12.title, 'Networking');
+  assert.ok(step12.resources && step12.resources.length >= 2);
+  assert.ok(step12.resources.some((r: any) => r.url.includes('nivet2006')));
+  assert.ok(step12.resources.some((r: any) => r.url.includes('nitheshvinod')));
 });
 
 test('Font scale levels and boundaries', async () => {
