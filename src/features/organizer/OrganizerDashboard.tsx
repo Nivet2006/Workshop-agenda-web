@@ -14,7 +14,7 @@ import {
   FileSpreadsheet
 } from 'lucide-react';
 import { EventModel, EventStep, UserProfile, EventMembership } from '../../types';
-import { getAllEvents, getEventSteps, createOrUpdateEvent } from '../../lib/supabase';
+import { getAllEvents, getEventSteps, createOrUpdateEvent, getAllEventSubmissions, getUserSubmissions } from '../../lib/supabase';
 
 interface OrganizerDashboardProps {
   currentEvent: EventModel;
@@ -59,15 +59,32 @@ export function OrganizerDashboard({
   }, [currentEvent.id]);
 
   const handleExportCSV = () => {
-    const headers = ['User ID', 'Display Name', 'Email', 'Status', 'Progress (%)', 'Last Active'];
-    const rows = participants.map(p => [
-      `"${p.id}"`,
-      `"${p.displayName.replace(/"/g, '""')}"`,
-      `"${p.email.replace(/"/g, '""')}"`,
-      `"${p.status}"`,
-      p.progressPercentage,
-      `"${p.lastActive}"`
-    ]);
+    const eventSubmissions = getAllEventSubmissions(currentEvent.id);
+    const headers = [
+      'User ID', 
+      'Display Name', 
+      'Email', 
+      'Status', 
+      'Progress (%)', 
+      'Last Active',
+      'Step 2 - Custom Vanity URL',
+      'Step 10 - Published Post URL',
+      'Step 11 - Final Profile Review URL'
+    ];
+    const rows = participants.map(p => {
+      const userSub = getUserSubmissions(p.id, currentEvent.id) || eventSubmissions[`${p.id}_${currentEvent.id}`];
+      return [
+        `"${p.id}"`,
+        `"${p.displayName.replace(/"/g, '""')}"`,
+        `"${p.email.replace(/"/g, '""')}"`,
+        `"${p.status}"`,
+        p.progressPercentage,
+        `"${p.lastActive}"`,
+        `"${(userSub?.customProfileUrl?.url || '').replace(/"/g, '""')}"`,
+        `"${(userSub?.publishedPostUrl?.url || '').replace(/"/g, '""')}"`,
+        `"${(userSub?.finalProfileUrl?.url || '').replace(/"/g, '""')}"`
+      ];
+    });
 
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);

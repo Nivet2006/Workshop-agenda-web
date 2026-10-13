@@ -88,10 +88,31 @@ export interface StepContent {
   samplePostText?: string;
   sampleHeadline?: string;
   sampleAboutText?: string;
+  aiPrompt?: string;
+  aiPromptTitle?: string;
   eventImages?: Array<{ url: string; caption?: string }>;
   submissionType?: 'url' | 'text';
+  submissionKey?: 'custom_profile_url' | 'published_post_url' | 'final_profile_url' | string;
   submissionLabel?: string;
   submissionPlaceholder?: string;
+}
+
+export interface DedicatedSubmission {
+  key: string;
+  label: string;
+  url: string;
+  stepId: string;
+  stepNumber: number;
+  submittedAt: string;
+}
+
+export interface UserSubmissionsRecord {
+  userId: string;
+  eventId: string;
+  customProfileUrl?: DedicatedSubmission;
+  publishedPostUrl?: DedicatedSubmission;
+  finalProfileUrl?: DedicatedSubmission;
+  updatedAt: string;
 }
 
 export interface StepTask {

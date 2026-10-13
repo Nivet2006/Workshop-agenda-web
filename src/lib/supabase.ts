@@ -15,7 +15,9 @@ import {
   QuizSessionMember,
   LeaderboardEntry,
   UserProfile,
-  EventMembership
+  EventMembership,
+  DedicatedSubmission,
+  UserSubmissionsRecord
 } from '../types';
 import { 
   sampleEvent, 
@@ -66,7 +68,32 @@ const LOCAL_STORAGE_KEYS = {
   SESSION_MEMBERS: 'eventflow_session_members',
   RESPONSES: 'eventflow_quiz_responses',
   MEMBERSHIPS: 'eventflow_memberships',
+  SUBMISSIONS: 'eventflow_user_submissions',
+  GUEST_USER_ID: 'eventflow_guest_user_id',
 };
+
+export const STEP_UUID_MAP: Record<string, string> = {
+  'li-step-01': 'e3000000-0000-0000-0000-000000000001',
+  'li-step-02': 'e3000000-0000-0000-0000-000000000002',
+  'li-step-03': 'e3000000-0000-0000-0000-000000000003',
+  'li-step-04': 'e3000000-0000-0000-0000-000000000004',
+  'li-step-05': 'e3000000-0000-0000-0000-000000000005',
+  'li-step-06': 'e3000000-0000-0000-0000-000000000006',
+  'li-step-07': 'e3000000-0000-0000-0000-000000000007',
+  'li-step-08': 'e3000000-0000-0000-0000-000000000008',
+  'li-step-09': 'e3000000-0000-0000-0000-000000000009',
+  'li-step-10': 'e3000000-0000-0000-0000-000000000010',
+  'li-step-11': 'e3000000-0000-0000-0000-000000000011',
+};
+
+export function getPersistentGuestId(): string {
+  let guestId = getLocalItem<string>(LOCAL_STORAGE_KEYS.GUEST_USER_ID, '');
+  if (!guestId) {
+    guestId = crypto.randomUUID();
+    setLocalItem(LOCAL_STORAGE_KEYS.GUEST_USER_ID, guestId);
+  }
+  return guestId;
+}
 
 function getLocalItem<T>(key: string, defaultValue: T): T {
   try {
@@ -94,6 +121,27 @@ if (!hasLinkedin || storedEvents.length === 0) {
   setLocalItem(LOCAL_STORAGE_KEYS.STEPS, allSeedSteps);
   if (!localStorage.getItem(LOCAL_STORAGE_KEYS.QUIZZES)) {
     setLocalItem(LOCAL_STORAGE_KEYS.QUIZZES, [sampleQuiz]);
+  }
+} else {
+  // Sync stored steps if cached with outdated quote marks
+  const storedSteps = getLocalItem<EventStep[]>(LOCAL_STORAGE_KEYS.STEPS, []);
+  const step01 = storedSteps.find(s => s.id === 'li-step-01');
+  if (step01 && (step01.content?.html?.includes('"Welcome') || step01.content?.html?.includes('asset."'))) {
+    const freshStep = allSeedSteps.find(s => s.id === 'li-step-01');
+    if (freshStep) {
+      const updatedSteps = storedSteps.map(s => s.id === 'li-step-01' ? freshStep : s);
+      setLocalItem(LOCAL_STORAGE_KEYS.STEPS, updatedSteps);
+    }
+  }
+
+  const step04 = storedSteps.find(s => s.id === 'li-step-04');
+  if (step04 && !step04.content?.aiPrompt) {
+    const freshStep04 = allSeedSteps.find(s => s.id === 'li-step-04');
+    if (freshStep04) {
+      const current = getLocalItem<EventStep[]>(LOCAL_STORAGE_KEYS.STEPS, []);
+      const updatedSteps = current.map(s => s.id === 'li-step-04' ? freshStep04 : s);
+      setLocalItem(LOCAL_STORAGE_KEYS.STEPS, updatedSteps);
+    }
   }
 }
 
@@ -485,28 +533,34 @@ export async function saveStepProgress(
   completionData?: Record<string, any>
 ): Promise<void> {
   const timestamp = new Date().toISOString();
+  const effectiveUserId = (!userId || userId === 'guest-user') ? getPersistentGuestId() : userId;
+  const dbStepId = STEP_UUID_MAP[stepId] || (stepId.includes('-') && stepId.length === 36 ? stepId : stepId);
 
-  if (supabase) {
-    const upsertObj: Record<string, any> = {
-      user_id: userId,
-      event_id: eventId,
-      step_id: stepId,
-      status,
-      completed_at: status === 'completed' ? timestamp : null,
-      last_opened_at: timestamp
-    };
-    if (completionData) {
-      upsertObj.completion_data = completionData;
+  // Only sync to Supabase if there is an explicit URL milestone submission
+  // General attendee step reading progress is kept strictly local
+  if (supabase && completionData && (completionData.submissionUrl || completionData.submissionKey)) {
+    try {
+      const upsertObj: Record<string, any> = {
+        user_id: effectiveUserId,
+        event_id: eventId,
+        step_id: dbStepId,
+        status,
+        completed_at: status === 'completed' ? timestamp : null,
+        last_opened_at: timestamp,
+        completion_data: completionData
+      };
+      await supabase.from('participant_step_progress').upsert(upsertObj, { onConflict: 'step_id,user_id' });
+    } catch (err) {
+      console.warn('Supabase remote submission sync note (stored locally):', err);
     }
-    await supabase.from('participant_step_progress').upsert(upsertObj, { onConflict: 'step_id,user_id' });
   }
 
   const list = getLocalItem<ParticipantStepProgress[]>(LOCAL_STORAGE_KEYS.STEP_PROGRESS, []);
-  const existing = list.find(p => p.userId === userId && p.stepId === stepId);
-  const filtered = list.filter(p => !(p.userId === userId && p.stepId === stepId));
+  const existing = list.find(p => (p.userId === userId || p.userId === effectiveUserId) && (p.stepId === stepId || p.stepId === dbStepId));
+  const filtered = list.filter(p => !((p.userId === userId || p.userId === effectiveUserId) && (p.stepId === stepId || p.stepId === dbStepId)));
   filtered.push({
     id: existing?.id || crypto.randomUUID(),
-    userId,
+    userId: effectiveUserId,
     eventId,
     stepId,
     status,
@@ -518,81 +572,135 @@ export async function saveStepProgress(
 }
 
 export async function getStepProgress(userId: string, stepId: string): Promise<ParticipantStepProgress | null> {
+  const effectiveUserId = (!userId || userId === 'guest-user') ? getPersistentGuestId() : userId;
+  const dbStepId = STEP_UUID_MAP[stepId] || (stepId.includes('-') && stepId.length === 36 ? stepId : stepId);
+
   if (supabase) {
-    const { data } = await supabase
-      .from('participant_step_progress')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('step_id', stepId)
-      .maybeSingle();
-    if (data) {
-      return {
-        id: data.id,
-        userId: data.user_id,
-        eventId: data.event_id,
-        stepId: data.step_id,
-        status: data.status,
-        completedAt: data.completed_at,
-        lastOpenedAt: data.last_opened_at,
-        completionData: data.completion_data
-      };
+    try {
+      const { data } = await supabase
+        .from('participant_step_progress')
+        .select('*')
+        .eq('user_id', effectiveUserId)
+        .eq('step_id', dbStepId)
+        .maybeSingle();
+      if (data) {
+        return {
+          id: data.id,
+          userId: data.user_id,
+          eventId: data.event_id,
+          stepId: data.step_id,
+          status: data.status,
+          completedAt: data.completed_at,
+          lastOpenedAt: data.last_opened_at,
+          completionData: data.completion_data
+        };
+      }
+    } catch (err) {
+      console.warn('Supabase get progress error (reading locally):', err);
     }
   }
 
   const list = getLocalItem<ParticipantStepProgress[]>(LOCAL_STORAGE_KEYS.STEP_PROGRESS, []);
-  return list.find(p => p.userId === userId && p.stepId === stepId) || null;
+  return list.find(p => (p.userId === userId || p.userId === effectiveUserId) && (p.stepId === stepId || p.stepId === dbStepId)) || null;
+}
+
+// -----------------------------------------------------------------------------
+// Dedicated Separate Submissions Registry
+// Saves Step 2 (vanity URL), Step 10 (post URL), Step 11 (profile URL) separately
+// -----------------------------------------------------------------------------
+
+export async function saveDedicatedSubmission(
+  userId: string,
+  eventId: string,
+  key: string,
+  url: string,
+  stepId: string,
+  stepNumber: number,
+  label: string
+): Promise<void> {
+  const timestamp = new Date().toISOString();
+  const effectiveUserId = (!userId || userId === 'guest-user') ? getPersistentGuestId() : userId;
+
+  const records = getLocalItem<Record<string, UserSubmissionsRecord>>(LOCAL_STORAGE_KEYS.SUBMISSIONS, {});
+  const userKey = `${effectiveUserId}_${eventId}`;
+  const existingRecord: UserSubmissionsRecord = records[userKey] || {
+    userId: effectiveUserId,
+    eventId,
+    updatedAt: timestamp
+  };
+
+  const item: DedicatedSubmission = {
+    key,
+    label,
+    url,
+    stepId,
+    stepNumber,
+    submittedAt: timestamp
+  };
+
+  if (key === 'custom_profile_url') {
+    existingRecord.customProfileUrl = item;
+  } else if (key === 'published_post_url') {
+    existingRecord.publishedPostUrl = item;
+  } else if (key === 'final_profile_url') {
+    existingRecord.finalProfileUrl = item;
+  }
+
+  existingRecord.updatedAt = timestamp;
+  records[userKey] = existingRecord;
+  setLocalItem(LOCAL_STORAGE_KEYS.SUBMISSIONS, records);
+
+  // Dispatch live update event for participants and organizers
+  window.dispatchEvent(new CustomEvent('eventflow_submission_saved', { 
+    detail: { record: existingRecord, key, url, userId: effectiveUserId, eventId } 
+  }));
+}
+
+export function getUserSubmissions(userId: string, eventId: string): UserSubmissionsRecord | null {
+  const effectiveUserId = (!userId || userId === 'guest-user') ? getPersistentGuestId() : userId;
+  const records = getLocalItem<Record<string, UserSubmissionsRecord>>(LOCAL_STORAGE_KEYS.SUBMISSIONS, {});
+  const userKey = `${effectiveUserId}_${eventId}`;
+  return records[userKey] || null;
+}
+
+export function getAllEventSubmissions(eventId: string): Record<string, UserSubmissionsRecord> {
+  const records = getLocalItem<Record<string, UserSubmissionsRecord>>(LOCAL_STORAGE_KEYS.SUBMISSIONS, {});
+  const filtered: Record<string, UserSubmissionsRecord> = {};
+  for (const [key, val] of Object.entries(records)) {
+    if (val.eventId === eventId) {
+      filtered[key] = val;
+    }
+  }
+  return filtered;
 }
 
 export async function getCompletedStepIds(userId: string, eventId: string): Promise<Set<string>> {
-  if (supabase) {
-    const { data } = await supabase
-      .from('participant_step_progress')
-      .select('step_id')
-      .eq('user_id', userId)
-      .eq('event_id', eventId)
-      .eq('status', 'completed');
-    if (data) {
-      return new Set(data.map(d => d.step_id));
-    }
-  }
-
+  // General participant step progress is managed strictly locally in client cache
   const list = getLocalItem<ParticipantStepProgress[]>(LOCAL_STORAGE_KEYS.STEP_PROGRESS, []);
+  const effectiveUserId = (!userId || userId === 'guest-user') ? getPersistentGuestId() : userId;
   return new Set(
     list
-      .filter(p => p.userId === userId && p.eventId === eventId && p.status === 'completed')
+      .filter(p => (p.userId === userId || p.userId === effectiveUserId) && p.eventId === eventId && p.status === 'completed')
       .map(p => p.stepId)
   );
 }
 
 export async function saveTaskProgress(userId: string, taskId: string, completed: boolean): Promise<void> {
-  if (supabase) {
-    if (completed) {
-      await supabase.from('participant_task_progress').upsert({
-        user_id: userId,
-        task_id: taskId,
-        completed_at: new Date().toISOString()
-      }, { onConflict: 'task_id,user_id' });
-    } else {
-      await supabase.from('participant_task_progress').delete().match({ user_id: userId, task_id: taskId });
-    }
-  }
-
+  // General attendee task checkbox clicks are kept strictly local
+  const effectiveUserId = (!userId || userId === 'guest-user') ? getPersistentGuestId() : userId;
   const list = getLocalItem<ParticipantTaskProgress[]>(LOCAL_STORAGE_KEYS.TASK_PROGRESS, []);
-  const filtered = list.filter(p => !(p.userId === userId && p.taskId === taskId));
+  const filtered = list.filter(p => !(p.userId === effectiveUserId && p.taskId === taskId));
   if (completed) {
-    filtered.push({ id: crypto.randomUUID(), userId, taskId, completedAt: new Date().toISOString() });
+    filtered.push({ id: crypto.randomUUID(), userId: effectiveUserId, taskId, completedAt: new Date().toISOString() });
   }
   setLocalItem(LOCAL_STORAGE_KEYS.TASK_PROGRESS, filtered);
 }
 
 export async function getCompletedTaskIds(userId: string): Promise<Set<string>> {
-  if (supabase) {
-    const { data } = await supabase.from('participant_task_progress').select('task_id').eq('user_id', userId);
-    if (data) return new Set(data.map(d => d.task_id));
-  }
-
+  // General attendee checklist progress is read strictly locally
+  const effectiveUserId = (!userId || userId === 'guest-user') ? getPersistentGuestId() : userId;
   const list = getLocalItem<ParticipantTaskProgress[]>(LOCAL_STORAGE_KEYS.TASK_PROGRESS, []);
-  return new Set(list.filter(p => p.userId === userId).map(p => p.taskId));
+  return new Set(list.filter(p => (p.userId === userId || p.userId === effectiveUserId)).map(p => p.taskId));
 }
 
 // -----------------------------------------------------------------------------

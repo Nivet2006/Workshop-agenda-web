@@ -18,11 +18,150 @@ import {
   Image as ImageIcon,
   Sparkles,
   Link2,
-  ArrowRight
+  ArrowRight,
+  AlertTriangle,
+  AlertCircle
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { EmbeddedQuiz } from '../features/quizzes/EmbeddedQuiz';
-import { saveStepProgress, getStepProgress } from '../lib/supabase';
+import { saveStepProgress, getStepProgress, saveDedicatedSubmission, getUserSubmissions } from '../lib/supabase';
+
+// -----------------------------------------------------------------------------
+// Real-Time Local Browser Validation & Diagnostics for LinkedIn URLs
+// Runs 100% locally in the browser with instant user feedback
+// -----------------------------------------------------------------------------
+export interface UrlAnalysisResult {
+  isValidUrl: boolean;
+  status: 'success' | 'warning' | 'error';
+  message: string;
+  handle: string;
+  hasNumericTail: boolean;
+  testUrl: string;
+}
+
+export function analyzeLinkedInUrl(
+  url: string, 
+  submissionKey?: string, 
+  stepNumber?: number
+): UrlAnalysisResult | null {
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+
+  const normalizedUrl = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(normalizedUrl);
+  } catch {
+    return {
+      isValidUrl: false,
+      status: 'error',
+      message: 'Please enter a valid URL (e.g. linkedin.com/in/your-name)',
+      handle: '',
+      hasNumericTail: false,
+      testUrl: ''
+    };
+  }
+
+  const hostname = parsed.hostname.toLowerCase();
+  const isLinkedIn = hostname === 'linkedin.com' || hostname.endsWith('.linkedin.com');
+
+  if (!isLinkedIn) {
+    return {
+      isValidUrl: false,
+      status: 'error',
+      message: 'URL must belong to the linkedin.com domain.',
+      handle: '',
+      hasNumericTail: false,
+      testUrl: normalizedUrl
+    };
+  }
+
+  const pathname = parsed.pathname;
+
+  // Step 10: Event Post Verification
+  if (submissionKey === 'published_post_url' || stepNumber === 10) {
+    const isPost = pathname.includes('/posts/') || pathname.includes('/feed/update/') || pathname.includes('/pulse/');
+    if (!isPost) {
+      return {
+        isValidUrl: false,
+        status: 'warning',
+        message: 'Expected a published post link (e.g. linkedin.com/posts/...).',
+        handle: '',
+        hasNumericTail: false,
+        testUrl: normalizedUrl
+      };
+    }
+    return {
+      isValidUrl: true,
+      status: 'success',
+      message: 'Valid LinkedIn published post link verified.',
+      handle: '',
+      hasNumericTail: false,
+      testUrl: normalizedUrl
+    };
+  }
+
+  // Profile URL Verification (Step 2 and Step 11)
+  const inMatch = pathname.match(/^\/in\/([^\/\?#]+)/i);
+  if (!inMatch) {
+    return {
+      isValidUrl: false,
+      status: 'warning',
+      message: 'Profile URLs should follow the /in/your-handle format (e.g. linkedin.com/in/firstnamelastname).',
+      handle: '',
+      hasNumericTail: false,
+      testUrl: normalizedUrl
+    };
+  }
+
+  const handle = decodeURIComponent(inMatch[1]);
+  const hasNumericTail = /-[0-9a-f]{5,}$/i.test(handle) || /-[0-9]{4,}$/.test(handle);
+  const hasInvalidChars = /[^a-zA-Z0-9\-]/.test(handle);
+  const isTooShort = handle.length < 3;
+
+  if (hasInvalidChars) {
+    return {
+      isValidUrl: true,
+      status: 'warning',
+      message: `Handle "${handle}" contains symbols. LinkedIn vanity URLs should only have letters, numbers, and hyphens.`,
+      handle,
+      hasNumericTail,
+      testUrl: normalizedUrl
+    };
+  }
+
+  if (hasNumericTail) {
+    return {
+      isValidUrl: true,
+      status: 'warning',
+      message: `Auto-generated numeric suffix detected on "${handle}". Edit it on LinkedIn to remove random numbers for a cleaner vanity link!`,
+      handle,
+      hasNumericTail: true,
+      testUrl: normalizedUrl
+    };
+  }
+
+  if (isTooShort) {
+    return {
+      isValidUrl: true,
+      status: 'warning',
+      message: `Handle "${handle}" is very short. Standard vanity handles are between 3 and 30 characters.`,
+      handle,
+      hasNumericTail: false,
+      testUrl: normalizedUrl
+    };
+  }
+
+  return {
+    isValidUrl: true,
+    status: 'success',
+    message: `Clean custom vanity URL verified: in/${handle}`,
+    handle,
+    hasNumericTail: false,
+    testUrl: normalizedUrl
+  };
+}
 
 interface StepViewerProps {
   step: EventStep;
@@ -58,20 +197,37 @@ export function StepViewer({
   const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [submittedAt, setSubmittedAt] = useState<string | null>(null);
 
-  // Load existing submission for this step
+  // Real-time local browser verification analysis
+  const urlAnalysis = useMemo(() => {
+    return analyzeLinkedInUrl(submissionUrl, step.content?.submissionKey, step.position);
+  }, [submissionUrl, step.content?.submissionKey, step.position]);
+
+  // Load existing submission for this step separately
   useEffect(() => {
     const userId = currentUser?.id || 'guest-user';
     getStepProgress(userId, step.id).then(progress => {
-      if (progress?.completionData?.submissionUrl) {
-        setSubmissionUrl(progress.completionData.submissionUrl);
-        setSubmittedAt(progress.completionData.submittedAt || null);
-      } else {
-        setSubmissionUrl('');
-        setSubmittedAt(null);
-      }
+      const submissions = getUserSubmissions(userId, step.eventId);
+      const stepKey = step.content?.submissionKey || (
+        step.position === 2 ? 'custom_profile_url' :
+        step.position === 10 ? 'published_post_url' :
+        step.position === 11 ? 'final_profile_url' : null
+      );
+      
+      const dedicatedSaved = stepKey === 'custom_profile_url' ? submissions?.customProfileUrl :
+                             stepKey === 'published_post_url' ? submissions?.publishedPostUrl :
+                             stepKey === 'final_profile_url' ? submissions?.finalProfileUrl : null;
+
+      const loadedUrl = progress?.completionData?.submissionUrl || 
+                        (stepKey ? progress?.completionData?.[stepKey] : null) || 
+                        dedicatedSaved?.url || '';
+
+      const loadedTimestamp = progress?.completionData?.submittedAt || dedicatedSaved?.submittedAt || null;
+
+      setSubmissionUrl(loadedUrl);
+      setSubmittedAt(loadedTimestamp);
       setSubmissionStatus('idle');
     });
-  }, [step.id, currentUser?.id]);
+  }, [step.id, step.position, step.eventId, currentUser?.id]);
 
   const copyToClipboard = (text: string, fieldId: string) => {
     navigator.clipboard.writeText(text);
@@ -81,18 +237,67 @@ export function StepViewer({
 
   const handleSaveSubmission = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!submissionUrl.trim()) return;
+    const raw = submissionUrl.trim();
+    if (!raw) return;
+
+    // Normalize URL with https protocol for reliable saving & clickable link
+    const cleanUrl = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+    setSubmissionUrl(cleanUrl);
 
     setSubmissionStatus('saving');
     const userId = currentUser?.id || 'guest-user';
     const timestamp = new Date().toISOString();
     
+    // Determine submission key and dedicated field based on step
+    const submissionKey = step.content?.submissionKey || (
+      step.position === 2 ? 'custom_profile_url' :
+      step.position === 10 ? 'published_post_url' :
+      step.position === 11 ? 'final_profile_url' : 'generic_submission_url'
+    );
+
+    const submissionCategory = (
+      step.position === 2 ? 'custom_profile_url' :
+      step.position === 10 ? 'published_post_url' :
+      step.position === 11 ? 'final_profile_review_url' : 'generic_url'
+    );
+
+    const completionPayload: Record<string, any> = {
+      submissionUrl: submissionUrl.trim(),
+      submissionKey,
+      submissionCategory,
+      submissionLabel: step.content?.submissionLabel || 'Submit URL',
+      stepNumber: step.position,
+      stepTitle: step.title,
+      stepId: step.id,
+      submittedAt: timestamp
+    };
+
+    if (submissionKey === 'custom_profile_url') {
+      completionPayload.customProfileUrl = submissionUrl.trim();
+    } else if (submissionKey === 'published_post_url') {
+      completionPayload.publishedPostUrl = submissionUrl.trim();
+    } else if (submissionKey === 'final_profile_url') {
+      completionPayload.finalProfileUrl = submissionUrl.trim();
+    }
+
+    // 1. Save step progress with distinct completion data
     await saveStepProgress(
       userId,
       step.eventId,
       step.id,
       isCompleted ? 'completed' : 'in_progress',
-      { submissionUrl: submissionUrl.trim(), submittedAt: timestamp }
+      completionPayload
+    );
+
+    // 2. Save dedicated separate submission record
+    await saveDedicatedSubmission(
+      userId,
+      step.eventId,
+      submissionKey,
+      submissionUrl.trim(),
+      step.id,
+      step.position,
+      step.content?.submissionLabel || 'Submit URL'
     );
 
     setSubmittedAt(timestamp);
@@ -216,6 +421,65 @@ export function StepViewer({
             </div>
           )}
 
+          {/* AI Prompt Copy Helper (Step 4: Profile Picture Generation and Upload) */}
+          {step.content?.aiPrompt && (
+            <div className="my-8 p-6 rounded-md bg-[#111111] border border-[#242424] space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#1B1B1B]">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-[4px] bg-[#161616] border border-[#242424] flex items-center justify-center text-[#C5A059]">
+                    <Sparkles size={14} />
+                  </div>
+                  <div>
+                    <h4 className="font-mono text-xs uppercase tracking-widest text-white">
+                      {step.content.aiPromptTitle || 'AI Headshot Generation Prompt'}
+                    </h4>
+                    <p className="text-xs text-[#666666] font-sans">
+                      Ready-to-use prompt for ChatGPT, Midjourney, Claude, Gemini, or Stable Diffusion
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => copyToClipboard(step.content.aiPrompt!, 'ai-prompt')}
+                  className={clsx(
+                    "flex items-center gap-2 px-4 py-2 rounded-md font-medium text-xs font-mono transition-all duration-200 shrink-0",
+                    copiedField === 'ai-prompt'
+                      ? "bg-[#14B8A6] text-black"
+                      : "bg-[#FF5722] hover:bg-[#E64A19] text-white shadow-sm"
+                  )}
+                  title="Click to copy full AI prompt to clipboard"
+                >
+                  {copiedField === 'ai-prompt' ? (
+                    <>
+                      <Check size={14} className="stroke-[2.5]" />
+                      <span>Copied to Clipboard!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={14} />
+                      <span>Copy AI Prompt</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <div className="relative">
+                <div className="p-4 bg-[#0A0A0A] border border-[#1B1B1B] rounded-[4px] text-xs font-mono text-[#A1A1A1] leading-relaxed whitespace-pre-wrap max-h-72 overflow-y-auto custom-scrollbar select-text">
+                  {step.content.aiPrompt}
+                </div>
+                <div className="mt-2 flex items-center justify-between text-[11px] font-mono text-[#666666]">
+                  <span>💡 Tip: Attach your casual photo and paste this prompt into an AI image tool.</span>
+                  <button
+                    onClick={() => copyToClipboard(step.content.aiPrompt!, 'ai-prompt')}
+                    className="text-[#C5A059] hover:underline"
+                  >
+                    Quick Copy ↗
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Step 10: Official LinkedIn Workshop Posting Guidelines */}
           {(step.content?.officialAccountMention || step.content?.requiredHashtags || step.content?.samplePostText) && (
             <div className="my-8 p-6 rounded-md bg-[#111111] border border-[#242424] space-y-5">
@@ -334,32 +598,88 @@ export function StepViewer({
               </div>
 
               <form onSubmit={handleSaveSubmission} className="space-y-3">
-                <div className="flex gap-2">
-                  <input
-                    type="url"
-                    value={submissionUrl}
-                    onChange={(e) => setSubmissionUrl(e.target.value)}
-                    placeholder={step.content.submissionPlaceholder || 'https://www.linkedin.com/...'}
-                    className="flex-1 px-4 py-2.5 bg-[#0A0A0A] border border-[#242424] rounded-md text-xs font-mono text-white placeholder-[#666666] focus:outline-none focus:border-white transition-colors"
-                  />
-                  <button
-                    type="submit"
-                    disabled={submissionStatus === 'saving' || !submissionUrl.trim()}
-                    className="px-5 py-2.5 rounded-md bg-[#FF5722] hover:bg-[#E64A19] text-white font-medium text-xs transition-colors disabled:opacity-50 flex items-center gap-1.5 shrink-0"
-                  >
-                    {submissionStatus === 'saved' ? (
-                      <>
-                        <Check size={14} />
-                        <span>Saved</span>
-                      </>
-                    ) : (
-                      <>
-                        <Send size={14} />
-                        <span>{submissionStatus === 'saving' ? 'Saving...' : 'Submit URL'}</span>
-                      </>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      value={submissionUrl}
+                      onChange={(e) => setSubmissionUrl(e.target.value)}
+                      placeholder={step.content.submissionPlaceholder || 'https://www.linkedin.com/...'}
+                      className={clsx(
+                        "w-full px-4 py-2.5 bg-[#0A0A0A] border rounded-md text-xs font-mono text-white placeholder-[#666666] focus:outline-none transition-colors",
+                        urlAnalysis?.status === 'success' ? "border-[#14B8A6] focus:border-[#14B8A6]" :
+                        urlAnalysis?.status === 'warning' ? "border-[#C5A059] focus:border-[#C5A059]" :
+                        urlAnalysis?.status === 'error' ? "border-[#FF5722] focus:border-[#FF5722]" :
+                        "border-[#242424] focus:border-white"
+                      )}
+                    />
+                  </div>
+
+                  <div className="flex gap-2 shrink-0">
+                    {/* Live In-Browser Test Link Button */}
+                    {urlAnalysis?.testUrl && (
+                      <a
+                        href={urlAnalysis.testUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3.5 py-2.5 rounded-md bg-[#161616] hover:bg-[#222222] border border-[#242424] text-xs font-mono text-[#D4D4D4] hover:text-white flex items-center gap-1.5 transition-colors"
+                        title="Open and test this link in a new tab"
+                      >
+                        <ExternalLink size={13} className="text-[#14B8A6]" />
+                        <span>Test Link</span>
+                      </a>
                     )}
-                  </button>
+
+                    <button
+                      type="submit"
+                      disabled={submissionStatus === 'saving' || !submissionUrl.trim()}
+                      className="px-5 py-2.5 rounded-md bg-[#FF5722] hover:bg-[#E64A19] text-white font-medium text-xs transition-colors disabled:opacity-50 flex items-center gap-1.5 shrink-0"
+                    >
+                      {submissionStatus === 'saved' ? (
+                        <>
+                          <Check size={14} />
+                          <span>Saved</span>
+                        </>
+                      ) : (
+                        <>
+                          <Send size={14} />
+                          <span>{submissionStatus === 'saving' ? 'Saving...' : 'Submit URL'}</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
+
+                {/* Real-Time Local Browser Verification Panel */}
+                {urlAnalysis && (
+                  <div className={clsx(
+                    "p-3 rounded-md border text-xs font-mono flex items-start gap-2.5 transition-all",
+                    urlAnalysis.status === 'success' && "bg-[#14B8A6]/10 border-[#14B8A6]/30 text-[#14B8A6]",
+                    urlAnalysis.status === 'warning' && "bg-[#C5A059]/10 border-[#C5A059]/30 text-[#C5A059]",
+                    urlAnalysis.status === 'error' && "bg-[#FF5722]/10 border-[#FF5722]/30 text-[#FF5722]"
+                  )}>
+                    {urlAnalysis.status === 'success' && <CheckCircle2 size={15} className="shrink-0 mt-0.5 text-[#14B8A6]" />}
+                    {urlAnalysis.status === 'warning' && <AlertTriangle size={15} className="shrink-0 mt-0.5 text-[#C5A059]" />}
+                    {urlAnalysis.status === 'error' && <AlertCircle size={15} className="shrink-0 mt-0.5 text-[#FF5722]" />}
+                    
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-semibold uppercase tracking-wider text-[10px]">
+                          {urlAnalysis.status === 'success' ? 'Verification Passed' : 
+                           urlAnalysis.status === 'warning' ? 'Optimization Tip' : 'Invalid Format'}
+                        </span>
+                        {urlAnalysis.handle && (
+                          <span className="text-[10px] opacity-80 font-sans">
+                            Handle: <span className="font-mono font-bold">in/{urlAnalysis.handle}</span>
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] leading-relaxed text-[#D4D4D4] font-sans">
+                        {urlAnalysis.message}
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {submittedAt && (
                   <p className="text-[11px] font-mono text-[#666666]">

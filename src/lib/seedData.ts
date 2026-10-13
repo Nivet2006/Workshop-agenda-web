@@ -705,8 +705,8 @@ export const linkedinSteps: EventStep[] = [
     objective: 'Ensure every attendee can access LinkedIn and verify account functionality.',
     content: {
       html: `
-        <p class="mb-4 text-base">"Welcome to the <strong>LinkedIn Profile Building Workshop</strong>.</p>
-        <p class="mb-4">Today you will transform your LinkedIn profile into a compelling, recruiter-ready professional asset."</p>
+        <p class="mb-4 text-base">Welcome to the <strong>LinkedIn Profile Building Workshop</strong>.</p>
+        <p class="mb-4">Today you will transform your LinkedIn profile into a compelling, recruiter-ready professional asset.</p>
 
         <div class="p-5 bg-zinc-900 border border-zinc-800 rounded-2xl mb-6">
           <h4 class="font-bold text-white mb-2 text-sm uppercase tracking-wider font-mono">Action Instructions:</h4>
@@ -772,6 +772,7 @@ export const linkedinSteps: EventStep[] = [
         </div>
       `,
       submissionType: 'url',
+      submissionKey: 'custom_profile_url',
       submissionLabel: 'Test & Verify: Paste your custom profile URL below',
       submissionPlaceholder: 'https://www.linkedin.com/in/your-name'
     },
@@ -877,7 +878,97 @@ export const linkedinSteps: EventStep[] = [
         <div class="p-4 bg-zinc-900/60 border border-zinc-800 rounded-xl text-xs text-zinc-400">
           <strong>How to upload:</strong> Click the circular camera icon on your LinkedIn profile picture &rarr; Upload photo &rarr; Adjust crop circle &rarr; Set visibility to "Public" or "All LinkedIn Members" &rarr; Save.
         </div>
-      `
+      `,
+      aiPromptTitle: 'Professional LinkedIn Profile Headshot AI Prompt',
+      aiPrompt: `## Prompt: Professional LinkedIn Profile Headshot
+
+**Objective:** Transform the uploaded photograph into a high-quality, photorealistic corporate headshot suitable for LinkedIn, professional networking, resumes, company profiles, and developer portfolios.
+
+### 1. Identity Preservation — Highest Priority
+
+Use the uploaded photograph as the primary and authoritative reference for the person's identity.
+
+- Preserve the person's exact facial identity, facial structure, face shape, skin tone, ethnicity, age appearance, eye shape, nose, lips, jawline, ears, and natural facial proportions.
+- Retain distinctive identifying features, natural asymmetry, facial hair, hairstyle, hairline, and other recognizable characteristics visible in the original.
+- Do not replace the face, generate a different person, beautify excessively, or apply artificial facial reconstruction.
+- Do not change the person's apparent age, alter their skin tone, slim or widen their face, enlarge their eyes, reshape their nose, or artificially modify their smile.
+- Maintain realistic skin texture, pores, fine facial details, and natural hair strands.
+- If the original photograph is low-resolution, improve clarity conservatively without inventing facial details.
+
+### 2. Professional Attire
+
+Dress the person in elegant, understated corporate attire appropriate for a software engineer or backend developer.
+
+- Preferred outfit: a well-fitted dark navy or charcoal blazer over a clean white or light-blue formal shirt.
+- Ensure the clothing fits naturally around the shoulders and neck.
+- Use realistic fabric texture, natural folds, proper collar alignment, and professional tailoring.
+- Keep accessories minimal and appropriate.
+- Avoid flashy patterns, visible logos, excessive jewellery, ties unless appropriate, or distracting accessories.
+- Preserve the person's natural body proportions.
+
+### 3. Head Position and Composition
+
+Create a conventional professional studio headshot.
+
+- Use a straight-on, front-facing composition with the person looking directly into the camera.
+- Keep the head upright, shoulders relaxed, and posture confident and natural.
+- Frame the image from the upper chest or shoulders upward.
+- Position the face centrally, with the head and shoulders balanced within the frame.
+- The face should occupy approximately 60% of the image height, with enough space above the head and around the shoulders.
+- Keep both eyes clearly visible and naturally aligned.
+- Use a natural, friendly, confident expression with a subtle, genuine smile.
+- Avoid exaggerated smiling, stiff poses, excessive head tilting, or dramatic angles.
+
+### 4. Lighting and Image Quality
+
+Use realistic professional portrait photography techniques.
+
+- Apply soft, diffused studio lighting that resembles natural window light.
+- Illuminate the face evenly while retaining natural facial contours and depth.
+- Avoid harsh shadows, blown highlights, excessive contrast, coloured lighting, and artificial glow.
+- Maintain accurate skin tones and neutral white balance.
+- Render sharp facial details, especially the eyes, while keeping the overall image natural.
+- Simulate a professional portrait lens with subtle background separation and realistic depth of field.
+- Avoid excessive sharpening, artificial skin smoothing, plastic-looking skin, HDR effects, or oversaturated colours.
+
+### 5. Background
+
+Use a clean, neutral, distraction-free background.
+
+- Preferred background: solid light grey, warm off-white, or a subtle neutral studio backdrop.
+- Keep the background uniform and professional.
+- Use gentle natural tonal separation between the subject and background.
+- Ensure the background does not blend awkwardly with the hair or shoulders.
+- Do not add office scenes, furniture, graphics, patterns, text, logos, artificial bokeh, or decorative elements.
+
+### 6. Retouching
+
+Apply only subtle, realistic professional retouching.
+
+- Correct minor lighting inconsistencies and temporary photographic imperfections.
+- Preserve natural skin texture, pores, facial hair, and individual characteristics.
+- Keep the eyes, teeth, hair, and skin realistic.
+- Do not remove permanent identifying features, birthmarks, scars, or natural characteristics.
+- Do not apply beauty filters, excessive whitening, face reshaping, artificial eye enhancement, or unrealistic skin smoothing.
+
+### 7. Technical Output
+
+- Aspect ratio: 1:1 square.
+- Resolution: at least 1024 × 1024 pixels, preferably higher if supported.
+- Output: one finished, high-resolution, photorealistic headshot.
+- Keep the face and shoulders within the central safe area for LinkedIn's circular profile-picture crop.
+- Ensure the image remains clear and recognizable at small profile-picture sizes.
+- Use natural colours, realistic proportions, and professional photographic quality.
+
+### 8. Strict Negative Instructions
+
+Do not generate a new identity. Do not change the person's face, age, skin tone, hairstyle, or distinctive features. Do not create an illustration, painting, anime portrait, 3D render, synthetic-looking face, or AI beauty portrait. Do not add text, watermarks, logos, borders, props, or unrelated objects. Do not distort the head, eyes, ears, shoulders, hands, clothing, or background edges.
+
+### Final Quality Standard
+
+The final result must look like an authentic photograph taken by a professional corporate portrait photographer, not an AI-generated image. It should communicate competence, approachability, confidence, authenticity, and professionalism while remaining unmistakably the same person shown in the uploaded photograph.
+
+**Execute the transformation using the uploaded photograph as the identity reference. Prioritize identity accuracy over aesthetic enhancement.**`
     },
     tasks: [
       { id: 'li-t4-1', stepId: 'li-step-04', title: 'Select or take a well-lit, front-facing headshot with neutral background', position: 1, required: true },
@@ -1168,6 +1259,7 @@ Huge thanks to the organizers and mentors for hosting such an impactful session!
 
 #LinkedInWorkshop #OnePercentClub #ProfessionalBranding #CareerGrowth #Networking`,
       submissionType: 'url',
+      submissionKey: 'published_post_url',
       submissionLabel: 'Submit Your Published LinkedIn Post URL',
       submissionPlaceholder: 'https://www.linkedin.com/posts/your-name_post-activity-...'
     },
@@ -1239,6 +1331,7 @@ Huge thanks to the organizers and mentors for hosting such an impactful session!
         </div>
       `,
       submissionType: 'url',
+      submissionKey: 'final_profile_url',
       submissionLabel: 'Submit Your Final Profile URL for Review',
       submissionPlaceholder: 'https://www.linkedin.com/in/your-custom-handle'
     },

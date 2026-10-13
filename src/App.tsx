@@ -300,38 +300,43 @@ export default function App() {
               <span>Guide</span>
             </button>
 
-            <button
-              onClick={() => setViewMode('live-quiz')}
-              className={clsx(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-wider transition-colors",
-                viewMode === 'live-quiz' ? "bg-[#161616] border border-[#242424] text-[#C5A059]" : "text-[#A1A1A1] hover:text-white hover:bg-[#111111]"
-              )}
-            >
-              <Play size={13} />
-              <span>Arena</span>
-            </button>
+            {/* Hidden for now: Arena, Organizer, Builder */}
+            {false && (
+              <>
+                <button
+                  onClick={() => setViewMode('live-quiz')}
+                  className={clsx(
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-wider transition-colors",
+                    viewMode === 'live-quiz' ? "bg-[#161616] border border-[#242424] text-[#C5A059]" : "text-[#A1A1A1] hover:text-white hover:bg-[#111111]"
+                  )}
+                >
+                  <Play size={13} />
+                  <span>Arena</span>
+                </button>
 
-            <button
-              onClick={() => setViewMode('organizer')}
-              className={clsx(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-wider transition-colors",
-                viewMode === 'organizer' ? "bg-[#161616] border border-[#242424] text-[#14B8A6]" : "text-[#A1A1A1] hover:text-white hover:bg-[#111111]"
-              )}
-            >
-              <BarChart3 size={13} />
-              <span>Organizer</span>
-            </button>
+                <button
+                  onClick={() => setViewMode('organizer')}
+                  className={clsx(
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-wider transition-colors",
+                    viewMode === 'organizer' ? "bg-[#161616] border border-[#242424] text-[#14B8A6]" : "text-[#A1A1A1] hover:text-white hover:bg-[#111111]"
+                  )}
+                >
+                  <BarChart3 size={13} />
+                  <span>Organizer</span>
+                </button>
 
-            <button
-              onClick={() => setViewMode('builder')}
-              className={clsx(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-wider transition-colors",
-                viewMode === 'builder' ? "bg-[#161616] border border-[#242424] text-white" : "text-[#A1A1A1] hover:text-white hover:bg-[#111111]"
-              )}
-            >
-              <Layers size={13} />
-              <span>Builder</span>
-            </button>
+                <button
+                  onClick={() => setViewMode('builder')}
+                  className={clsx(
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-wider transition-colors",
+                    viewMode === 'builder' ? "bg-[#161616] border border-[#242424] text-white" : "text-[#A1A1A1] hover:text-white hover:bg-[#111111]"
+                  )}
+                >
+                  <Layers size={13} />
+                  <span>Builder</span>
+                </button>
+              </>
+            )}
           </div>
 
           {/* Right: Progress, Event Code Switcher, Profile & Fullscreen */}
@@ -342,60 +347,64 @@ export default function App() {
               <span className="text-xs font-mono text-[#14B8A6] font-medium">{progressPercentage}%</span>
             </div>
 
-            {/* Event Access Code Badge */}
-            <button
-              onClick={() => setIsEventAccessModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#111111] border border-[#242424] text-[#D4D4D4] hover:text-white hover:border-[#404040] transition-colors text-xs font-mono"
-              title="Click to switch or enter event code"
-            >
-              <KeyRound size={12} className="text-[#C5A059]" />
-              <span>{currentEvent.accessCode}</span>
-            </button>
-
-            {/* User Profile / Auth Button */}
-            {currentUser ? (
-              <div className="relative">
-                <button
-                  onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#111111] border border-[#242424] text-xs font-sans text-white hover:border-[#404040] transition-colors"
-                >
-                  <span className="w-4 h-4 rounded-[2px] bg-[#242424] text-[#A1A1A1] flex items-center justify-center text-[10px] font-mono font-bold">
-                    {currentUser.displayName.charAt(0)}
-                  </span>
-                  <span className="truncate max-w-[90px]">{currentUser.displayName}</span>
-                  <ChevronDown size={12} className="text-[#666666]" />
-                </button>
-
-                {isUserMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-[#111111] border border-[#242424] rounded-md py-1 z-50 text-xs">
-                    <button
-                      onClick={() => { setIsProfileModalOpen(true); setIsUserMenuOpen(false); }}
-                      className="w-full text-left px-4 py-2 hover:bg-[#161616] text-[#A1A1A1] hover:text-white"
-                    >
-                      Edit Display Name
-                    </button>
-                    <button
-                      onClick={async () => {
-                        await signOutUser();
-                        setCurrentUser(null);
-                        setIsUserMenuOpen(false);
-                      }}
-                      className="w-full text-left px-4 py-2 hover:bg-[#161616] text-[#FF5722] flex items-center gap-2"
-                    >
-                      <LogOut size={12} />
-                      <span>Sign Out</span>
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : (
+            {/* Hidden for now: Event Access Code Badge (LINKEDIN) */}
+            {false && (
               <button
-                onClick={() => setIsAuthModalOpen(true)}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-[#FF5722] hover:bg-[#E64A19] text-white text-xs font-medium transition-colors"
+                onClick={() => setIsEventAccessModalOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#111111] border border-[#242424] text-[#D4D4D4] hover:text-white hover:border-[#404040] transition-colors text-xs font-mono"
+                title="Click to switch or enter event code"
               >
-                <LogIn size={13} />
-                <span>Sign In</span>
+                <KeyRound size={12} className="text-[#C5A059]" />
+                <span>{currentEvent.accessCode}</span>
               </button>
+            )}
+
+            {/* Hidden for now: User Profile / Auth Button (Sign In) */}
+            {false && (
+              currentUser ? (
+                <div className="relative">
+                  <button
+                    onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#111111] border border-[#242424] text-xs font-sans text-white hover:border-[#404040] transition-colors"
+                  >
+                    <span className="w-4 h-4 rounded-[2px] bg-[#242424] text-[#A1A1A1] flex items-center justify-center text-[10px] font-mono font-bold">
+                      {currentUser.displayName.charAt(0)}
+                    </span>
+                    <span className="truncate max-w-[90px]">{currentUser.displayName}</span>
+                    <ChevronDown size={12} className="text-[#666666]" />
+                  </button>
+
+                  {isUserMenuOpen && (
+                    <div className="absolute right-0 mt-2 w-48 bg-[#111111] border border-[#242424] rounded-md py-1 z-50 text-xs">
+                      <button
+                        onClick={() => { setIsProfileModalOpen(true); setIsUserMenuOpen(false); }}
+                        className="w-full text-left px-4 py-2 hover:bg-[#161616] text-[#A1A1A1] hover:text-white"
+                      >
+                        Edit Display Name
+                      </button>
+                      <button
+                        onClick={async () => {
+                          await signOutUser();
+                          setCurrentUser(null);
+                          setIsUserMenuOpen(false);
+                        }}
+                        className="w-full text-left px-4 py-2 hover:bg-[#161616] text-[#FF5722] flex items-center gap-2"
+                      >
+                        <LogOut size={12} />
+                        <span>Sign Out</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <button
+                  onClick={() => setIsAuthModalOpen(true)}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-[#FF5722] hover:bg-[#E64A19] text-white text-xs font-medium transition-colors"
+                >
+                  <LogIn size={13} />
+                  <span>Sign In</span>
+                </button>
+              )
             )}
 
             {/* Fullscreen Toggle */}
