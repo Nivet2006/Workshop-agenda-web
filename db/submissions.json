@@ -1,0 +1,18 @@
+[
+  {
+    "stepNumber": 2,
+    "id": "sub_real_test",
+    "userName": "Workshop Participant",
+    "eventId": "e0000000-0000-0000-0000-000000000002",
+    "status": "valid",
+    "userId": "guest-user",
+    "key": "custom_profile_url",
+    "submittedAt": "2026-10-13T14:04:29.1941343Z",
+    "handle": "nivet2006",
+    "userEmail": "",
+    "label": "Custom Vanity Profile URL",
+    "url": "https://www.linkedin.com/in/nivet2006",
+    "stepTitle": "Custom Profile URL Configuration",
+    "eventTitle": "LinkedIn Profile Building"
+  }
+]

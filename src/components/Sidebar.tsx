@@ -18,6 +18,7 @@ interface SidebarProps {
   isHidden: boolean;
   eventTitle?: string;
   accessCode?: string;
+  onLogoClick?: (e: React.MouseEvent) => void;
 }
 
 const STEP_ICON_MAP: Record<StepType, any> = {
@@ -45,7 +46,8 @@ export function Sidebar({
   completedSteps, 
   isHidden,
   eventTitle = 'Workshop Agenda',
-  accessCode = 'LINKEDIN'
+  accessCode = 'LINKEDIN',
+  onLogoClick
 }: SidebarProps) {
 
   const getSectionTitle = (sectionId?: string) => {
@@ -88,7 +90,9 @@ export function Sidebar({
                   <img 
                     src="/logotext.png" 
                     alt="The One Percent Club" 
-                    className="h-5 max-w-[210px] w-auto object-contain" 
+                    className="h-5 max-w-[210px] w-auto object-contain cursor-pointer select-none" 
+                    onClick={onLogoClick}
+                    title="The One Percent Club"
                   />
                 </div>
               </div>

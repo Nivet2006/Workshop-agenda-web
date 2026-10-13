@@ -25,6 +25,7 @@ import {
 import { clsx } from 'clsx';
 import { EmbeddedQuiz } from '../features/quizzes/EmbeddedQuiz';
 import { saveStepProgress, getStepProgress, saveDedicatedSubmission, getUserSubmissions } from '../lib/supabase';
+import { saveDbSubmission } from '../lib/dbService';
 
 // -----------------------------------------------------------------------------
 // Real-Time Local Browser Validation & Diagnostics for LinkedIn URLs
@@ -296,11 +297,25 @@ export function StepViewer({
       userId,
       step.eventId,
       submissionKey,
-      submissionUrl.trim(),
+      cleanUrl,
       step.id,
       step.position,
       step.content?.submissionLabel || 'Submit URL'
     );
+
+    // 3. Persist to ./db/submissions.json database
+    await saveDbSubmission({
+      userId,
+      userName: currentUser?.displayName || 'Workshop Participant',
+      userEmail: currentUser?.email || '',
+      eventId: step.eventId,
+      key: submissionKey,
+      label: step.content?.submissionLabel || 'Submit URL',
+      stepNumber: step.position,
+      stepTitle: step.title,
+      url: cleanUrl,
+      handle: urlAnalysis?.handle || ''
+    });
 
     setSubmittedAt(timestamp);
     setSubmissionStatus('saved');

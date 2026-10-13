@@ -32,8 +32,9 @@ import {
   LINKEDIN_EVENT_ID
 } from './seedData';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const env = (typeof import.meta !== 'undefined' && import.meta.env) ? import.meta.env : (process.env as any || {});
+const supabaseUrl = env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = env.VITE_SUPABASE_ANON_KEY || '';
 
 export const isSupabaseConfigured = (): boolean => {
   return Boolean(
@@ -97,6 +98,7 @@ export function getPersistentGuestId(): string {
 
 function getLocalItem<T>(key: string, defaultValue: T): T {
   try {
+    if (typeof localStorage === 'undefined') return defaultValue;
     const raw = localStorage.getItem(key);
     return raw ? JSON.parse(raw) : defaultValue;
   } catch (e) {
@@ -106,6 +108,7 @@ function getLocalItem<T>(key: string, defaultValue: T): T {
 
 function setLocalItem<T>(key: string, value: T): void {
   try {
+    if (typeof localStorage === 'undefined') return;
     localStorage.setItem(key, JSON.stringify(value));
   } catch (e) {
     console.error('LocalStorage write error', e);
@@ -113,16 +116,17 @@ function setLocalItem<T>(key: string, value: T): void {
 }
 
 // Initialize seed data into local storage cache
-const storedEvents = getLocalItem<EventModel[]>(LOCAL_STORAGE_KEYS.EVENTS, []);
-const hasLinkedin = storedEvents.some(e => e.id === linkedinEvent.id);
-if (!hasLinkedin || storedEvents.length === 0) {
-  setLocalItem(LOCAL_STORAGE_KEYS.EVENTS, allSeedEvents);
-  setLocalItem(LOCAL_STORAGE_KEYS.SECTIONS, allSeedSections);
-  setLocalItem(LOCAL_STORAGE_KEYS.STEPS, allSeedSteps);
-  if (!localStorage.getItem(LOCAL_STORAGE_KEYS.QUIZZES)) {
-    setLocalItem(LOCAL_STORAGE_KEYS.QUIZZES, [sampleQuiz]);
-  }
-} else {
+if (typeof localStorage !== 'undefined') {
+  const storedEvents = getLocalItem<EventModel[]>(LOCAL_STORAGE_KEYS.EVENTS, []);
+  const hasLinkedin = storedEvents.some(e => e.id === linkedinEvent.id);
+  if (!hasLinkedin || storedEvents.length === 0) {
+    setLocalItem(LOCAL_STORAGE_KEYS.EVENTS, allSeedEvents);
+    setLocalItem(LOCAL_STORAGE_KEYS.SECTIONS, allSeedSections);
+    setLocalItem(LOCAL_STORAGE_KEYS.STEPS, allSeedSteps);
+    if (!localStorage.getItem(LOCAL_STORAGE_KEYS.QUIZZES)) {
+      setLocalItem(LOCAL_STORAGE_KEYS.QUIZZES, [sampleQuiz]);
+    }
+  } else {
   // Sync stored steps if cached with outdated quote marks
   const storedSteps = getLocalItem<EventStep[]>(LOCAL_STORAGE_KEYS.STEPS, []);
   const step01 = storedSteps.find(s => s.id === 'li-step-01');
@@ -143,6 +147,7 @@ if (!hasLinkedin || storedEvents.length === 0) {
       setLocalItem(LOCAL_STORAGE_KEYS.STEPS, updatedSteps);
     }
   }
+}
 }
 
 // -----------------------------------------------------------------------------

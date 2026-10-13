@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { StepViewer } from './components/StepViewer';
 import { AuthModal } from './features/auth/AuthModal';
@@ -37,6 +37,7 @@ import {
   linkedinSections,
   linkedinSteps
 } from './lib/seedData';
+import { SubmissionsDatabaseModal } from './features/submissions/SubmissionsDatabaseModal';
 import { 
   Menu, 
   Maximize2, 
@@ -52,7 +53,8 @@ import {
   ChevronDown,
   PanelLeft,
   Plus,
-  Minus
+  Minus,
+  Database
 } from 'lucide-react';
 import { clsx } from 'clsx';
 
@@ -128,6 +130,58 @@ export default function App() {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isEventAccessModalOpen, setIsEventAccessModalOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isSubmissionsDbOpen, setIsSubmissionsDbOpen] = useState(false);
+
+  // Hidden Submissions DB Easter Egg Unlock (revealed by triple-clicking logo)
+  const [isSubmissionsDbUnlocked, setIsSubmissionsDbUnlocked] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        return sessionStorage.getItem('workshop_submissions_db_unlocked') === 'true';
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  });
+
+  const logoClickRef = useRef<{ count: number; timer: ReturnType<typeof setTimeout> | null }>({ count: 0, timer: null });
+
+  const handleLogoClick = (e: React.MouseEvent) => {
+    const triggerUnlock = () => {
+      setIsSubmissionsDbUnlocked(prev => {
+        const next = !prev;
+        try {
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem('workshop_submissions_db_unlocked', String(next));
+          }
+        } catch {}
+        if (next) {
+          setIsSubmissionsDbOpen(true);
+        }
+        return next;
+      });
+    };
+
+    // 1. Native browser triple click
+    if (e.detail === 3) {
+      triggerUnlock();
+      return;
+    }
+
+    // 2. Click count threshold within 700ms window
+    const tracker = logoClickRef.current;
+    tracker.count += 1;
+    if (tracker.timer) clearTimeout(tracker.timer);
+
+    if (tracker.count >= 3) {
+      tracker.count = 0;
+      triggerUnlock();
+    } else {
+      tracker.timer = setTimeout(() => {
+        tracker.count = 0;
+      }, 700);
+    }
+  };
 
   // Progress tracking
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
@@ -282,7 +336,9 @@ export default function App() {
         <img 
           src="/logotext.png" 
           alt="The One Percent Club" 
-          className="h-5 max-w-[180px] w-auto object-contain shrink-0" 
+          className="h-5 max-w-[180px] w-auto object-contain shrink-0 cursor-pointer select-none" 
+          onClick={handleLogoClick}
+          title="The One Percent Club"
         />
         <button
           onClick={() => setIsEventAccessModalOpen(true)}
@@ -308,6 +364,7 @@ export default function App() {
           isHidden={isFullscreen}
           eventTitle={currentEvent.title}
           accessCode={currentEvent.accessCode}
+          onLogoClick={handleLogoClick}
         />
       )}
 
@@ -334,7 +391,9 @@ export default function App() {
               <img 
                 src="/logotext.png" 
                 alt="The One Percent Club" 
-                className="h-5 sm:h-6 max-h-6 w-auto max-w-[200px] lg:max-w-[240px] object-contain shrink-0" 
+                className="h-5 sm:h-6 max-h-6 w-auto max-w-[200px] lg:max-w-[240px] object-contain shrink-0 cursor-pointer select-none" 
+                onClick={handleLogoClick}
+                title="The One Percent Club"
               />
             </div>
 
@@ -486,6 +545,18 @@ export default function App() {
               )
             )}
 
+            {/* View Submissions Database (./db) - Only visible when logo is triple clicked */}
+            {isSubmissionsDbUnlocked && (
+              <button
+                onClick={() => setIsSubmissionsDbOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#111111] border border-[#14B8A6]/50 text-[#14B8A6] hover:text-white hover:bg-[#161616] transition-all text-xs font-mono group animate-in fade-in duration-200"
+                title="View all submissions saved to database in ./db (Unlocked via logo triple-click)"
+              >
+                <Database size={13} className="text-[#14B8A6] group-hover:scale-110 transition-transform" />
+                <span className="hidden md:inline">Submissions DB</span>
+              </button>
+            )}
+
             {/* Fullscreen Toggle */}
             <button
               onClick={toggleFullscreen}
@@ -595,6 +666,13 @@ export default function App() {
             setCurrentStepId(stp[0].id);
           }
         }}
+      />
+
+      {/* Submissions & Link Database Modal */}
+      <SubmissionsDatabaseModal
+        isOpen={isSubmissionsDbOpen}
+        onClose={() => setIsSubmissionsDbOpen(false)}
+        eventId={currentEvent.id}
       />
     </div>
   );

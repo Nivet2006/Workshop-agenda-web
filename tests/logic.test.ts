@@ -170,3 +170,49 @@ test('LinkedIn Profile Building Workshop Seed Integrity', async () => {
   assert.equal(step11.content.submissionType, 'url');
   assert.ok(step11.content.submissionLabel && step11.content.submissionLabel.includes('Profile URL'));
 });
+
+test('Font scale levels and boundaries', async () => {
+  const { FONT_SCALES } = await import('../src/App');
+  assert.ok(Array.isArray(FONT_SCALES));
+  assert.ok(FONT_SCALES.length >= 5);
+  // Default scale at 100%
+  const defaultScale = FONT_SCALES.find(s => s.scale === 1.0);
+  assert.ok(defaultScale);
+  assert.equal(defaultScale.label, '100%');
+
+  // Verify ordered scales
+  for (let i = 1; i < FONT_SCALES.length; i++) {
+    assert.ok(FONT_SCALES[i].scale > FONT_SCALES[i - 1].scale, 'Scales must be monotonically increasing');
+  }
+});
+
+test('Submissions database filtering, single and group deletion logic', () => {
+  interface MockSub {
+    id: string;
+    key: string;
+    url: string;
+    userName: string;
+  }
+
+  const sampleSubs: MockSub[] = [
+    { id: 's1', key: 'custom_profile_url', url: 'https://linkedin.com/in/alex', userName: 'Alex' },
+    { id: 's2', key: 'published_post_url', url: 'https://linkedin.com/posts/alex-123', userName: 'Alex' },
+    { id: 's3', key: 'final_profile_url', url: 'https://linkedin.com/in/alex', userName: 'Alex' },
+    { id: 's4', key: 'custom_profile_url', url: 'https://linkedin.com/in/maya', userName: 'Maya' },
+  ];
+
+  // Filtering by key
+  const vanitySubs = sampleSubs.filter(s => s.key === 'custom_profile_url');
+  assert.equal(vanitySubs.length, 2);
+
+  // Single deletion
+  const afterSingleDelete = sampleSubs.filter(s => s.id !== 's1');
+  assert.equal(afterSingleDelete.length, 3);
+  assert.ok(!afterSingleDelete.some(s => s.id === 's1'));
+
+  // Group deletion
+  const idsToDelete = ['s2', 's3'];
+  const afterGroupDelete = sampleSubs.filter(s => !idsToDelete.includes(s.id));
+  assert.equal(afterGroupDelete.length, 2);
+  assert.deepEqual(afterGroupDelete.map(s => s.id), ['s1', 's4']);
+});

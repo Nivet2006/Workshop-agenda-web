@@ -11,8 +11,10 @@ import {
   Clock, 
   X,
   Radio,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Database
 } from 'lucide-react';
+import { SubmissionsDatabaseModal } from '../submissions/SubmissionsDatabaseModal';
 import { EventModel, EventStep, UserProfile, EventMembership } from '../../types';
 import { getAllEvents, getEventSteps, createOrUpdateEvent, getAllEventSubmissions, getUserSubmissions } from '../../lib/supabase';
 
@@ -37,6 +39,7 @@ export function OrganizerDashboard({
   const [announcementText, setAnnouncementText] = useState('');
   const [activeAnnouncement, setActiveAnnouncement] = useState<string | null>(null);
   const [currentLiveStepId, setCurrentLiveStepId] = useState<string>(currentEvent.currentStepId || '');
+  const [isSubmissionsDbModalOpen, setIsSubmissionsDbModalOpen] = useState(false);
 
   const [participants, setParticipants] = useState<Array<{
     id: string;
@@ -139,6 +142,15 @@ export function OrganizerDashboard({
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsSubmissionsDbModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#161616] hover:bg-[#222222] border border-[#242424] text-[#14B8A6] text-xs font-mono transition-colors"
+            title="View link submissions saved to database in ./db"
+          >
+            <Database size={13} />
+            <span>Submissions DB</span>
+          </button>
+
           <button
             onClick={onLaunchLiveQuiz}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#161616] hover:bg-[#222222] border border-[#242424] text-[#C5A059] text-xs font-mono transition-colors"
@@ -306,6 +318,15 @@ export function OrganizerDashboard({
               </div>
 
               <button
+                onClick={() => setIsSubmissionsDbModalOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1 bg-[#161616] hover:bg-[#222222] border border-[#242424] rounded-md text-xs font-mono text-[#14B8A6] hover:text-white transition-colors"
+                title="View all milestone link submissions in ./db"
+              >
+                <Database size={13} />
+                <span>Submissions DB (./db)</span>
+              </button>
+
+              <button
                 onClick={handleExportCSV}
                 className="flex items-center gap-1.5 px-3 py-1 bg-[#161616] hover:bg-[#222222] border border-[#242424] rounded-md text-xs font-mono text-[#D4D4D4] hover:text-white transition-colors"
                 title="Export participants to CSV"
@@ -363,6 +384,12 @@ export function OrganizerDashboard({
           </div>
         </div>
       </div>
+
+      <SubmissionsDatabaseModal
+        isOpen={isSubmissionsDbModalOpen}
+        onClose={() => setIsSubmissionsDbModalOpen(false)}
+        eventId={currentEvent.id}
+      />
     </div>
   </div>
   );
