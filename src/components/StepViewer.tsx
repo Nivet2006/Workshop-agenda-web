@@ -334,27 +334,7 @@ export function StepViewer({
     }
 
     try {
-      // 1. Save step progress with distinct completion data
-      await saveStepProgress(
-        effectiveUserId,
-        step.eventId,
-        step.id,
-        isCompleted ? 'completed' : 'in_progress',
-        completionPayload
-      );
-
-      // 2. Save dedicated separate submission record
-      await saveDedicatedSubmission(
-        effectiveUserId,
-        step.eventId,
-        submissionKey,
-        cleanUrl,
-        step.id,
-        step.position,
-        submissionLabel
-      );
-
-      // 3. Persist to ./db/submissions.json database
+      // 1. Direct and instant persistence to Supabase submissions database table
       await saveDbSubmission({
         userId: effectiveUserId,
         userName: currentUser?.displayName || 'Workshop Participant',
@@ -368,6 +348,34 @@ export function StepViewer({
         url: cleanUrl,
         handle: urlAnalysis?.handle || ''
       });
+
+      // 2. Save dedicated separate submission record to local cache
+      try {
+        await saveDedicatedSubmission(
+          effectiveUserId,
+          step.eventId,
+          submissionKey,
+          cleanUrl,
+          step.id,
+          step.position,
+          submissionLabel
+        );
+      } catch (cacheErr) {
+        console.warn('Dedicated submission cache note:', cacheErr);
+      }
+
+      // 3. Update participant progress
+      try {
+        await saveStepProgress(
+          effectiveUserId,
+          step.eventId,
+          step.id,
+          isCompleted ? 'completed' : 'in_progress',
+          completionPayload
+        );
+      } catch (progressErr) {
+        console.warn('Step progress note:', progressErr);
+      }
 
       setSubmittedAt(timestamp);
       setSubmissionStatus('saved');

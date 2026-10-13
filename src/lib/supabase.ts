@@ -32,9 +32,18 @@ import {
   LINKEDIN_EVENT_ID
 } from './seedData';
 
-const env = (typeof import.meta !== 'undefined' && import.meta.env) ? import.meta.env : (process.env as any || {});
-const supabaseUrl = env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = env.VITE_SUPABASE_ANON_KEY || '';
+export const DEFAULT_SUPABASE_URL = 'https://vjferdjamkrbnszbhksj.supabase.co';
+export const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZqZmVyZGphbWtyYm5zemJoa3NqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3MTMxMTUsImV4cCI6MjEwNzI4OTExNX0.28HdjKO7aB5atlqjU4RM8Cgq8PtqO5NYqADYK7IzLec';
+
+const supabaseUrl = 
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL) ||
+  (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_URL) ||
+  DEFAULT_SUPABASE_URL;
+
+const supabaseAnonKey = 
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_ANON_KEY) ||
+  (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_ANON_KEY) ||
+  DEFAULT_SUPABASE_ANON_KEY;
 
 export const isSupabaseConfigured = (): boolean => {
   return Boolean(
