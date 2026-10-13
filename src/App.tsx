@@ -6,66 +6,199 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { StepViewer } from './components/StepViewer';
-import { workshopSteps } from './data';
-import { Menu, Maximize2, Minimize2, CheckCircle2 } from 'lucide-react';
+import { AuthModal } from './features/auth/AuthModal';
+import { ProfileConfirmationModal } from './features/auth/ProfileConfirmationModal';
+import { EventAccessModal } from './features/events/EventAccessModal';
+import { LiveQuizRoom } from './features/live-quiz/LiveQuizRoom';
+import { OrganizerDashboard } from './features/organizer/OrganizerDashboard';
+import { GuideBuilder } from './features/guide-builder/GuideBuilder';
+import { 
+  EventModel, 
+  EventSection, 
+  EventStep, 
+  UserProfile 
+} from './types';
+import { 
+  getEventByCode, 
+  getEventSections, 
+  getEventSteps, 
+  saveStepProgress, 
+  getCompletedStepIds, 
+  saveTaskProgress, 
+  getCompletedTaskIds, 
+  getCurrentUserProfile, 
+  signOutUser 
+} from './lib/supabase';
+import { 
+  sampleEvent, 
+  sampleSections, 
+  sampleSteps,
+  linkedinEvent,
+  linkedinSections,
+  linkedinSteps
+} from './lib/seedData';
+import { 
+  Menu, 
+  Maximize2, 
+  Minimize2, 
+  LogIn, 
+  User, 
+  Layers, 
+  BarChart3, 
+  Play, 
+  KeyRound, 
+  Compass, 
+  LogOut,
+  ChevronDown,
+  PanelLeft
+} from 'lucide-react';
 import { clsx } from 'clsx';
 
+type AppViewMode = 'guide' | 'live-quiz' | 'organizer' | 'builder';
+
 export default function App() {
-  const [currentStepId, setCurrentStepId] = useState(1);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<AppViewMode>('guide');
+  const [currentEvent, setCurrentEvent] = useState<EventModel>(linkedinEvent);
+  const [sections, setSections] = useState<EventSection[]>(linkedinSections);
+  const [steps, setSteps] = useState<EventStep[]>(linkedinSteps);
+  const [currentStepId, setCurrentStepId] = useState<string>(linkedinSteps[0].id);
+
+  // Search & Filtering
   const [searchQuery, setSearchQuery] = useState('');
-  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 1024;
+    }
+    return true;
+  });
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // User Profile & Auth
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isEventAccessModalOpen, setIsEventAccessModalOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+
+  // Progress tracking
+  const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
+  const [completedTaskIds, setCompletedTaskIds] = useState<Set<string>>(new Set());
+
+  // Load User Profile on mount
+  useEffect(() => {
+    const loadProfile = async () => {
+      const profile = await getCurrentUserProfile();
+      setCurrentUser(profile);
+      const userId = profile ? profile.id : 'guest-user';
+      const stepIds = await getCompletedStepIds(userId, currentEvent.id);
+      const taskIds = await getCompletedTaskIds(userId);
+      setCompletedSteps(stepIds);
+      setCompletedTaskIds(taskIds);
+    };
+
+    loadProfile();
+    const handleAuthChange = () => loadProfile();
+    window.addEventListener('eventflow_auth_change', handleAuthChange);
+    return () => window.removeEventListener('eventflow_auth_change', handleAuthChange);
+  }, [currentEvent.id]);
+
+  // Load Event Data when event changes
+  useEffect(() => {
+    const loadEventData = async () => {
+      const [loadedSections, loadedSteps] = await Promise.all([
+        getEventSections(currentEvent.id),
+        getEventSteps(currentEvent.id)
+      ]);
+
+      if (loadedSections.length > 0) setSections(loadedSections);
+      if (loadedSteps.length > 0) {
+        setSteps(loadedSteps);
+        setCurrentStepId(loadedSteps[0].id);
+      }
+    };
+
+    loadEventData();
+  }, [currentEvent.id]);
 
   // Filter steps based on search query
   const filteredSteps = useMemo(() => {
-    if (!searchQuery.trim()) return workshopSteps;
+    if (!searchQuery.trim()) return steps;
     const query = searchQuery.toLowerCase();
-    return workshopSteps.filter(step => 
+    return steps.filter(step => 
       step.title.toLowerCase().includes(query) || 
-      step.content.toLowerCase().includes(query)
+      (step.content?.html && step.content.html.toLowerCase().includes(query)) ||
+      (step.summary && step.summary.toLowerCase().includes(query))
     );
-  }, [searchQuery]);
+  }, [searchQuery, steps]);
 
-  // Ensure current step is valid after filtering
-  const currentStep = workshopSteps.find(s => s.id === currentStepId) || workshopSteps[0];
+  const currentStep = useMemo(() => {
+    return steps.find(s => s.id === currentStepId) || steps[0] || sampleSteps[0];
+  }, [steps, currentStepId]);
+
+  const currentStepIndex = useMemo(() => {
+    return steps.findIndex(s => s.id === currentStep.id);
+  }, [steps, currentStep.id]);
 
   // Progress Calculation
-  const progressPercentage = Math.round((completedSteps.size / workshopSteps.length) * 100);
+  const progressPercentage = useMemo(() => {
+    if (steps.length === 0) return 0;
+    return Math.round((completedSteps.size / steps.length) * 100);
+  }, [completedSteps.size, steps.length]);
 
   const handleNext = () => {
-    if (currentStepId < workshopSteps.length) {
-      setCurrentStepId(prev => prev + 1);
+    if (currentStepIndex < steps.length - 1) {
+      setCurrentStepId(steps[currentStepIndex + 1].id);
     }
   };
 
   const handlePrev = () => {
-    if (currentStepId > 1) {
-      setCurrentStepId(prev => prev - 1);
+    if (currentStepIndex > 0) {
+      setCurrentStepId(steps[currentStepIndex - 1].id);
     }
   };
 
-  const handleSelectStep = (id: number) => {
+  const handleSelectStep = (id: string) => {
     setCurrentStepId(id);
     setIsSidebarOpen(false);
   };
 
-  const toggleStepCompletion = (id: number) => {
+  const toggleStepCompletion = async (id: string) => {
+    const isCurrentlyDone = completedSteps.has(id);
+    const newStatus = isCurrentlyDone ? 'in_progress' : 'completed';
+
     setCompletedSteps(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(id)) {
+      if (isCurrentlyDone) {
         newSet.delete(id);
       } else {
         newSet.add(id);
       }
       return newSet;
     });
+
+    const userId = currentUser ? currentUser.id : 'guest-user';
+    await saveStepProgress(userId, currentEvent.id, id, newStatus);
+  };
+
+  const toggleTask = async (taskId: string, isDone: boolean) => {
+    setCompletedTaskIds(prev => {
+      const newSet = new Set(prev);
+      if (isDone) {
+        newSet.delete(taskId);
+      } else {
+        newSet.add(taskId);
+      }
+      return newSet;
+    });
+
+    const userId = currentUser ? currentUser.id : 'guest-user';
+    await saveTaskProgress(userId, taskId, !isDone);
   };
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch((e) => {
-        console.error(`Error attempting to enable fullscreen mode: ${e.message} (${e.name})`);
+        console.error(`Fullscreen request failed: ${e.message}`);
       });
       setIsFullscreen(true);
     } else {
@@ -76,7 +209,6 @@ export default function App() {
     }
   };
 
-  // Listen for fullscreen change events (e.g. user pressing Esc)
   useEffect(() => {
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
@@ -86,106 +218,295 @@ export default function App() {
   }, []);
 
   return (
-    <div className="flex h-screen bg-black text-white overflow-hidden font-sans selection:bg-white selection:text-black">
-      {/* Mobile Header */}
+    <div className="flex h-screen bg-[#0A0A0A] text-white overflow-hidden font-sans selection:bg-[#FF5722] selection:text-white">
+      {/* Mobile Top Header */}
       <div className={clsx(
-        "lg:hidden fixed top-0 left-0 right-0 h-16 bg-black/80 backdrop-blur border-b border-zinc-900 z-30 flex items-center justify-between px-4 transition-transform duration-300",
+        "lg:hidden fixed top-0 left-0 right-0 h-14 bg-[#0A0A0A] border-b border-[#242424] z-30 flex items-center justify-between px-4 transition-transform duration-300",
         isFullscreen && "-translate-y-full"
       )}>
         <button 
           onClick={() => setIsSidebarOpen(true)}
-          className="p-2 text-zinc-400 hover:text-white"
+          className="p-2 text-[#A1A1A1] hover:text-white"
         >
-          <Menu size={24} />
+          <Menu size={20} />
         </button>
-        <span className="font-bold tracking-widest text-sm">NIVET2006</span>
-        <div className="w-8" /> {/* Spacer for balance */}
+        <img 
+          src="/logotext.png" 
+          alt="The One Percent Club" 
+          className="h-5 max-w-[180px] w-auto object-contain shrink-0" 
+        />
+        <button
+          onClick={() => setIsEventAccessModalOpen(true)}
+          className="text-xs font-mono text-[#A1A1A1] hover:text-white"
+        >
+          <KeyRound size={16} />
+        </button>
       </div>
 
-      <Sidebar 
-        steps={filteredSteps}
-        allSteps={workshopSteps}
-        currentStepId={currentStepId}
-        onSelectStep={handleSelectStep}
-        isOpen={isSidebarOpen}
-        onClose={() => setIsSidebarOpen(false)}
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        completedSteps={completedSteps}
-        isHidden={isFullscreen}
+      {/* Main Left Navigation Sidebar (Participant Guide) */}
+      {viewMode === 'guide' && (
+        <Sidebar 
+          steps={filteredSteps}
+          allSteps={steps}
+          sections={sections}
+          currentStepId={currentStepId}
+          onSelectStep={handleSelectStep}
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          completedSteps={completedSteps}
+          isHidden={isFullscreen}
+          eventTitle={currentEvent.title}
+          accessCode={currentEvent.accessCode}
+        />
+      )}
+
+      {/* Central View Switcher & Screen Canvas */}
+      <main className="flex-1 flex flex-col relative w-full pt-14 lg:pt-0 transition-all duration-300 overflow-hidden bg-[#0A0A0A]">
+        {/* Top Desktop Controls & Navigation Bar */}
+        <div className={clsx(
+          "h-14 border-b border-[#242424] px-6 flex items-center justify-between bg-[#0A0A0A] z-20 shrink-0",
+          isFullscreen ? "hidden" : "flex"
+        )}>
+          {/* Left: View Switcher Nav */}
+          <div className="flex items-center gap-2 lg:gap-3 shrink-0">
+            {viewMode === 'guide' && (
+              <button
+                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                className="hidden lg:flex items-center justify-center p-2 rounded-md text-[#A1A1A1] hover:text-white hover:bg-[#161616] border border-[#242424] transition-colors"
+                title={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+              >
+                <PanelLeft size={14} />
+              </button>
+            )}
+
+            <div className="flex items-center pr-3 lg:pr-4 border-r border-[#242424]">
+              <img 
+                src="/logotext.png" 
+                alt="The One Percent Club" 
+                className="h-5 sm:h-6 max-h-6 w-auto max-w-[200px] lg:max-w-[240px] object-contain shrink-0" 
+              />
+            </div>
+
+            <button
+              onClick={() => setViewMode('guide')}
+              className={clsx(
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-wider transition-colors",
+                viewMode === 'guide' ? "bg-[#161616] border border-[#242424] text-white" : "text-[#A1A1A1] hover:text-white hover:bg-[#111111]"
+              )}
+            >
+              <Compass size={13} />
+              <span>Guide</span>
+            </button>
+
+            <button
+              onClick={() => setViewMode('live-quiz')}
+              className={clsx(
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-wider transition-colors",
+                viewMode === 'live-quiz' ? "bg-[#161616] border border-[#242424] text-[#C5A059]" : "text-[#A1A1A1] hover:text-white hover:bg-[#111111]"
+              )}
+            >
+              <Play size={13} />
+              <span>Arena</span>
+            </button>
+
+            <button
+              onClick={() => setViewMode('organizer')}
+              className={clsx(
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-wider transition-colors",
+                viewMode === 'organizer' ? "bg-[#161616] border border-[#242424] text-[#14B8A6]" : "text-[#A1A1A1] hover:text-white hover:bg-[#111111]"
+              )}
+            >
+              <BarChart3 size={13} />
+              <span>Organizer</span>
+            </button>
+
+            <button
+              onClick={() => setViewMode('builder')}
+              className={clsx(
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-wider transition-colors",
+                viewMode === 'builder' ? "bg-[#161616] border border-[#242424] text-white" : "text-[#A1A1A1] hover:text-white hover:bg-[#111111]"
+              )}
+            >
+              <Layers size={13} />
+              <span>Builder</span>
+            </button>
+          </div>
+
+          {/* Right: Progress, Event Code Switcher, Profile & Fullscreen */}
+          <div className="flex items-center gap-3 shrink-0">
+            {/* Minimal Progress Indicator */}
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#111111] border border-[#242424]">
+              <span className="text-[9px] font-mono text-[#666666] uppercase tracking-wider">PROGRESS</span>
+              <span className="text-xs font-mono text-[#14B8A6] font-medium">{progressPercentage}%</span>
+            </div>
+
+            {/* Event Access Code Badge */}
+            <button
+              onClick={() => setIsEventAccessModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#111111] border border-[#242424] text-[#D4D4D4] hover:text-white hover:border-[#404040] transition-colors text-xs font-mono"
+              title="Click to switch or enter event code"
+            >
+              <KeyRound size={12} className="text-[#C5A059]" />
+              <span>{currentEvent.accessCode}</span>
+            </button>
+
+            {/* User Profile / Auth Button */}
+            {currentUser ? (
+              <div className="relative">
+                <button
+                  onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#111111] border border-[#242424] text-xs font-sans text-white hover:border-[#404040] transition-colors"
+                >
+                  <span className="w-4 h-4 rounded-[2px] bg-[#242424] text-[#A1A1A1] flex items-center justify-center text-[10px] font-mono font-bold">
+                    {currentUser.displayName.charAt(0)}
+                  </span>
+                  <span className="truncate max-w-[90px]">{currentUser.displayName}</span>
+                  <ChevronDown size={12} className="text-[#666666]" />
+                </button>
+
+                {isUserMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-[#111111] border border-[#242424] rounded-md py-1 z-50 text-xs">
+                    <button
+                      onClick={() => { setIsProfileModalOpen(true); setIsUserMenuOpen(false); }}
+                      className="w-full text-left px-4 py-2 hover:bg-[#161616] text-[#A1A1A1] hover:text-white"
+                    >
+                      Edit Display Name
+                    </button>
+                    <button
+                      onClick={async () => {
+                        await signOutUser();
+                        setCurrentUser(null);
+                        setIsUserMenuOpen(false);
+                      }}
+                      className="w-full text-left px-4 py-2 hover:bg-[#161616] text-[#FF5722] flex items-center gap-2"
+                    >
+                      <LogOut size={12} />
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <button
+                onClick={() => setIsAuthModalOpen(true)}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-[#FF5722] hover:bg-[#E64A19] text-white text-xs font-medium transition-colors"
+              >
+                <LogIn size={13} />
+                <span>Sign In</span>
+              </button>
+            )}
+
+            {/* Fullscreen Toggle */}
+            <button
+              onClick={toggleFullscreen}
+              className="p-2 rounded-md bg-[#111111] border border-[#242424] text-[#A1A1A1] hover:text-white transition-colors"
+              title="Toggle Fullscreen"
+            >
+              {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+            </button>
+          </div>
+        </div>
+
+        {/* Floating Fullscreen Exit Button */}
+        {isFullscreen && (
+          <div className="absolute top-4 right-6 z-30">
+            <button
+              onClick={toggleFullscreen}
+              className="p-2 rounded-md bg-[#111111] border border-[#242424] text-[#A1A1A1] hover:text-white transition-colors"
+              title="Exit Fullscreen"
+            >
+              <Minimize2 size={16} />
+            </button>
+          </div>
+        )}
+
+        {/* Dynamic View Canvas */}
+        <div className="flex-1 flex overflow-hidden">
+          {viewMode === 'guide' && (
+            <StepViewer 
+              step={currentStep}
+              totalSteps={steps.length}
+              onNext={handleNext}
+              onPrev={handlePrev}
+              isFirst={currentStepIndex === 0}
+              isLast={currentStepIndex === steps.length - 1}
+              isCompleted={completedSteps.has(currentStep.id)}
+              onToggleComplete={() => toggleStepCompletion(currentStep.id)}
+              searchQuery={searchQuery}
+              completedTaskIds={completedTaskIds}
+              onToggleTask={toggleTask}
+              currentUser={currentUser}
+            />
+          )}
+
+          {viewMode === 'live-quiz' && (
+            <LiveQuizRoom
+              currentUser={currentUser || { id: 'guest-1', displayName: 'Workshop Guest' }}
+              onExit={() => setViewMode('guide')}
+            />
+          )}
+
+          {viewMode === 'organizer' && (
+            <OrganizerDashboard
+              currentEvent={currentEvent}
+              onSelectEvent={(evt) => setCurrentEvent(evt)}
+              onOpenBuilder={() => setViewMode('builder')}
+              onLaunchLiveQuiz={() => setViewMode('live-quiz')}
+              onClose={() => setViewMode('guide')}
+            />
+          )}
+
+          {viewMode === 'builder' && (
+            <GuideBuilder
+              event={currentEvent}
+              onClose={() => setViewMode('guide')}
+              onPreview={() => setViewMode('guide')}
+              onStepsChange={(newSteps) => setSteps(newSteps)}
+              onEventChange={(newEvent) => setCurrentEvent(newEvent)}
+            />
+          )}
+        </div>
+      </main>
+
+      {/* Global Modals */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onSuccess={async () => {
+          const profile = await getCurrentUserProfile();
+          setCurrentUser(profile);
+        }}
       />
 
-      <main className="flex-1 flex flex-col relative w-full pt-16 lg:pt-0 transition-all duration-300">
-        {/* Desktop Badge & Controls */}
-        <div className={clsx(
-          "absolute top-6 right-8 z-20 flex items-center gap-4 transition-all duration-500",
-          isFullscreen ? "opacity-0 pointer-events-none translate-y-[-20px]" : "opacity-100"
-        )}>
-           {/* Progress Indicator */}
-           <div className="flex items-center gap-3 px-4 py-2 rounded-full bg-zinc-900/50 border border-zinc-800 backdrop-blur">
-            <div className="flex flex-col items-end">
-              <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider">Progress</span>
-              <span className="text-sm font-bold font-mono text-emerald-400">{progressPercentage}%</span>
-            </div>
-            <div className="w-8 h-8 rounded-full border-2 border-zinc-700 flex items-center justify-center relative">
-               <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                <path
-                  className="text-zinc-800"
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="text-emerald-500 transition-all duration-1000 ease-out"
-                  strokeDasharray={`${progressPercentage}, 100`}
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-              </svg>
-            </div>
-          </div>
+      <ProfileConfirmationModal
+        isOpen={isProfileModalOpen}
+        profile={currentUser}
+        onConfirmed={(updatedName) => {
+          if (currentUser) {
+            setCurrentUser({ ...currentUser, displayName: updatedName });
+          }
+          setIsProfileModalOpen(false);
+        }}
+      />
 
-          <div className="font-bold tracking-[0.2em] text-sm text-zinc-500 hover:text-white transition-colors cursor-default border border-zinc-800 px-4 py-3 rounded-full bg-black/50 backdrop-blur">
-            NIVET2006
-          </div>
-
-          <button
-            onClick={toggleFullscreen}
-            className="p-3 rounded-full bg-zinc-900/50 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
-            title="Toggle Fullscreen"
-          >
-            {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
-          </button>
-        </div>
-
-        {/* Floating Fullscreen Exit Button (Visible only when fullscreen) */}
-        <div className={clsx(
-          "absolute top-6 right-8 z-30 transition-all duration-500",
-          isFullscreen ? "opacity-100 translate-y-0" : "opacity-0 pointer-events-none translate-y-[-20px]"
-        )}>
-           <button
-            onClick={toggleFullscreen}
-            className="p-3 rounded-full bg-black/50 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors backdrop-blur"
-            title="Exit Fullscreen"
-          >
-            <Minimize2 size={18} />
-          </button>
-        </div>
-
-        <StepViewer 
-          step={currentStep}
-          onNext={handleNext}
-          onPrev={handlePrev}
-          isFirst={currentStepId === 1}
-          isLast={currentStepId === workshopSteps.length}
-          isCompleted={completedSteps.has(currentStep.id)}
-          onToggleComplete={() => toggleStepCompletion(currentStep.id)}
-          searchQuery={searchQuery}
-        />
-      </main>
+      <EventAccessModal
+        isOpen={isEventAccessModalOpen}
+        onClose={() => setIsEventAccessModalOpen(false)}
+        onEventSelected={async (selected) => {
+          setCurrentEvent(selected);
+          const [sec, stp] = await Promise.all([
+            getEventSections(selected.id),
+            getEventSteps(selected.id)
+          ]);
+          if (sec.length > 0) setSections(sec);
+          if (stp.length > 0) {
+            setSteps(stp);
+            setCurrentStepId(stp[0].id);
+          }
+        }}
+      />
     </div>
   );
 }
