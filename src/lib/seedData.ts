@@ -781,7 +781,7 @@ export const linkedinSteps: EventStep[] = [
       `,
       submissionType: 'url',
       submissionKey: 'custom_profile_url',
-      submissionLabel: 'Test & Verify: Paste your custom profile URL below',
+      submissionLabel: 'Paste your custom profile URL below',
       submissionPlaceholder: 'https://www.linkedin.com/in/your-name'
     },
     tasks: [
@@ -1020,7 +1020,130 @@ The final result must look like an authentic photograph taken by a professional 
         <div class="p-4 bg-zinc-900/60 border border-zinc-800 rounded-xl text-xs text-zinc-400">
           <strong>Tools:</strong> You can create a free custom banner on Canva (<a href="https://www.canva.com/templates/banners/linkedin/" target="_blank" rel="noopener noreferrer" class="text-blue-400 underline">Canva LinkedIn Banner Templates</a>) or Figma.
         </div>
-      `
+      `,
+      bannerPrompt: `# Prompt: Premium Minimalist LinkedIn Profile Banner for a Software Engineer
+
+## Objective
+Design a premium, modern, highly professional LinkedIn profile banner that communicates my identity as a computer science engineering student, aspiring AI/ML engineer, and software developer. The banner should feel authentic, technically sophisticated, and carefully art-directed—not like a generic AI-generated template.
+
+## 1. Canvas and Technical Specifications
+- **Dimensions:** 1584 × 396 pixels.
+- **Aspect ratio:** 4:1 widescreen.
+- **Output:** High-resolution, crisp, professional banner optimized for LinkedIn.
+- Keep all essential content inside a central safe area, accounting for different desktop and mobile crops.
+- Maintain generous negative space and excellent readability at smaller display sizes.
+
+## 2. Visual Direction
+Create an understated, premium technology aesthetic inspired by Linear, Apple, Swiss editorial design, and contemporary developer portfolios.
+
+The design should communicate:
+- Technical competence
+- Curiosity and continuous learning
+- Software engineering and AI innovation
+- A builder's mindset
+- Professional ambition without exaggeration
+
+Avoid the stereotypical futuristic AI aesthetic. Do not use excessive gradients, neon effects, glowing particles, holograms, stock imagery, or crowded technology illustrations.
+
+## 3. Color Palette
+Use a restrained, cohesive palette:
+- Background: Near-black #0A0A0A or deep charcoal #111111.
+- Primary text: White #FFFFFF.
+- Secondary text: Muted gray #A1A1AA.
+- Accent: Restrained electric blue #60A5FA, used sparingly.
+- Optional dividers and technical details: #27272A.
+
+Prefer solid colors and subtle tonal variation. Do not use strong gradients, ambient glows, glassmorphism, or decorative textures.
+
+## 4. Layout and Composition
+
+### Left section — Clear negative space
+Keep the leftmost portion visually quiet because LinkedIn's circular profile photograph overlaps this region.
+
+- No headline, important text, logo, or essential visual element in the bottom-left area.
+- Avoid important details near the left edge.
+- Allow the background to continue naturally behind the profile-picture overlap.
+- Keep this region clean on both desktop and mobile layouts.
+
+### Center-right section — Main identity
+Place the main content toward the center-right, using a precise alignment grid.
+
+Main headline:
+**BUILDING TECHNOLOGY THAT MATTERS.**
+
+Supporting line:
+**AI / ML · Software Engineering · Web Development**
+
+Typography should be modern, clean, and confident. Use a contemporary sans-serif typeface similar to Inter, Geist, or SF Pro.
+
+- Headline: Medium to bold weight, with controlled letter spacing.
+- Supporting line: Smaller, muted gray typography.
+- Maintain a clear hierarchy without oversized, aggressive lettering.
+
+### Right section — Technical visual language
+Introduce a small, sophisticated technical motif that reinforces the engineering theme.
+
+Possible elements:
+- Fine geometric lines and modular grid structures.
+- Minimal node-and-connection diagrams.
+- Abstract representations of data flow or system architecture.
+- Tiny, understated terminal-inspired details.
+- A few precisely aligned dots or thin technical dividers.
+
+Keep these elements subtle and secondary to the text. They should feel intentionally designed rather than randomly generated.
+
+## 5. Personalized Content
+Use the following identity and professional direction as the basis for the design:
+
+- **Name:** Nived Shaji
+- **Role:** Computer Science Engineering Student
+- **Professional direction:** Aspiring AI/ML Engineer and Software Developer
+- **Interests:** Artificial Intelligence, Machine Learning, Web Engineering, Backend Development, and Building Useful Technology.
+
+If the name is included, display it discreetly. The banner should complement the LinkedIn profile rather than repeat an entire résumé.
+
+Optional portfolio reference:
+nivet2006.in
+
+Include the portfolio URL only if it can be rendered accurately and legibly. Do not invent additional credentials, job titles, company affiliations, achievements, or certification claims.
+
+## 6. Typography and Text Rendering
+Use a maximum of two font styles and a strict typographic hierarchy.
+
+- Keep text sharp, aligned, and professionally spaced.
+- Avoid decorative, futuristic, handwritten, or excessively condensed fonts.
+- Render all text exactly as supplied.
+- Preserve punctuation and capitalization.
+- Do not introduce random letters, fake code, misspelled words, or illegible microtext.
+- Do not add unnecessary slogans or multiple competing headlines.
+
+## 7. Overall Design Quality
+The finished banner should look like a custom-designed personal brand asset created by a skilled graphic designer.
+
+It should be:
+- Minimal yet distinctive.
+- Technical without looking cluttered.
+- Modern without relying on visual effects.
+- Professional without feeling corporate or generic.
+- Consistent with a clean developer portfolio and professional headshot.
+
+Use spacing, alignment, typography, and contrast—not decorative effects—to create visual impact.
+
+## 8. Strict Negative Instructions
+Do not include:
+- The circular profile photograph or any additional human portraits.
+- Large logos or unofficial brand marks.
+- Random programming symbols, code screenshots, or meaningless terminal text.
+- Multiple technology icons scattered across the banner.
+- Stock photographs, office scenes, robots, circuit-board backgrounds, or AI brains.
+- Neon lighting, strong gradients, glow effects, lens flares, or 3D elements.
+- Excessive colors, decorative borders, visual clutter, or unnecessary labels.
+- Claims of professional experience, expertise, or achievements that have not been supplied.
+
+## Final Quality Standard
+Produce one finished LinkedIn banner at exactly 1584 × 396 pixels, with a clean near-black background, restrained white typography, subtle engineering-inspired details, and carefully balanced negative space.
+
+The final result should establish a recognizable personal brand for Nived Shaji: a computer science student focused on AI/ML and software engineering who enjoys building meaningful technology. It must feel intentional, understated, technically credible, and visually consistent with a premium developer portfolio.`
     },
     tasks: [
       { id: 'li-t5-1', stepId: 'li-step-05', title: 'Create or choose a personalized banner (1584 x 396 px)', position: 1, required: true },
@@ -1076,7 +1199,14 @@ The final result must look like an authentic photograph taken by a professional 
 
         <p class="text-xs text-zinc-500 italic">Important: Do not fabricate experience. Write naturally in your own authentic voice.</p>
       `,
-      sampleAboutText: `I am a Computer Science Engineering student at Gopalan College of Engineering and Management (GCEM), Bengaluru, with a deep interest in software engineering and cloud systems. Currently building practical applications and eager to collaborate!`
+      sampleAboutText: `I am a Computer Science Engineering student at Gopalan College of Engineering and Management (GCEM), Bengaluru, with a deep interest in software engineering and cloud systems. Currently building practical applications and eager to collaborate!`,
+      aboutPrompt: `1. Who you are: Introduce yourself and your current degree or role.
+2. Current focus: Mention your primary technical or domain interests.
+3. Projects & highlights: Briefly describe 1–2 practical projects, hackathons, or learning milestones.
+4. Non-technical strengths: Teamwork, problem-solving, community involvement.
+5. Career vision: What kind of engineering or professional challenges excite you.
+6. Call to action: Invite connections, mentorship, and collaboration.
+ask me these questions and build me a linkedin about section`
     },
     tasks: [
       { id: 'li-t6-1', stepId: 'li-step-06', title: 'Draft opening statement introducing current study / professional role', position: 1, required: true },
@@ -1364,23 +1494,25 @@ Huge thanks to the organizers and mentors for hosting such an impactful session!
     required: false,
     completionRule: 'manual',
     publishedVersion: 1,
-    summary: 'Connect with workshop speakers Nived Shaji and Nithesh V on LinkedIn',
-    objective: 'Scan QR codes to connect with workshop speakers Nived Shaji and Nithesh V on LinkedIn.',
+    summary: 'Connect with One Percent Club, Nived Shaji, and Nithesh V on LinkedIn',
+    objective: 'Scan QR codes to connect with One Percent Club and speakers Nived Shaji and Nithesh V on LinkedIn.',
     content: {
       html: `
         <p class="mb-4 text-base">Congratulations on finishing all workshop milestones!</p>
-        <p class="mb-4 text-sm text-zinc-300">The final component of today's session is direct networking. Connect with today's speakers and mentors below to keep in touch for career mentorship, code reviews, and upcoming engineering workshops.</p>
+        <p class="mb-4 text-sm text-zinc-300">The final component of today's session is direct networking. Connect with the <strong>One Percent Club</strong> and today's speakers below to keep in touch for career mentorship, code reviews, and upcoming engineering workshops.</p>
       `
     },
     tasks: [
-      { id: 'li-t12-1', stepId: 'li-step-12', title: 'Scan or open Nived Shaji\'s LinkedIn profile', position: 1, required: true },
-      { id: 'li-t12-2', stepId: 'li-step-12', title: 'Send a personalized connection request to Nived Shaji', position: 2, required: true },
-      { id: 'li-t12-3', stepId: 'li-step-12', title: 'Scan or open Nithesh V\'s LinkedIn profile', position: 3, required: true },
-      { id: 'li-t12-4', stepId: 'li-step-12', title: 'Send a personalized connection request to Nithesh V', position: 4, required: true }
+      { id: 'li-t12-0', stepId: 'li-step-12', title: 'Follow the One Percent Club LinkedIn page', position: 1, required: true },
+      { id: 'li-t12-1', stepId: 'li-step-12', title: 'Scan or open Nived Shaji\'s LinkedIn profile', position: 2, required: true },
+      { id: 'li-t12-2', stepId: 'li-step-12', title: 'Send a personalized connection request to Nived Shaji', position: 3, required: true },
+      { id: 'li-t12-3', stepId: 'li-step-12', title: 'Scan or open Nithesh V\'s LinkedIn profile', position: 4, required: true },
+      { id: 'li-t12-4', stepId: 'li-step-12', title: 'Send a personalized connection request to Nithesh V', position: 5, required: true }
     ],
     resources: [
-      { id: 'res-sp-1', stepId: 'li-step-12', label: 'Nived Shaji (linkedin.com/in/nivet2006)', type: 'link', url: 'https://www.linkedin.com/in/nivet2006/', position: 1 },
-      { id: 'res-sp-2', stepId: 'li-step-12', label: 'Nithesh V (linkedin.com/in/nitheshvinod)', type: 'link', url: 'https://www.linkedin.com/in/nitheshvinod/', position: 2 }
+      { id: 'res-sp-0', stepId: 'li-step-12', label: 'One Percent Club (linkedin.com/in/theonepercentclub)', type: 'link', url: 'https://www.linkedin.com/in/theonepercentclub/', position: 1 },
+      { id: 'res-sp-1', stepId: 'li-step-12', label: 'Nived Shaji (linkedin.com/in/nivet2006)', type: 'link', url: 'https://www.linkedin.com/in/nivet2006/', position: 2 },
+      { id: 'res-sp-2', stepId: 'li-step-12', label: 'Nithesh V (linkedin.com/in/nitheshvinod)', type: 'link', url: 'https://www.linkedin.com/in/nitheshvinod/', position: 3 }
     ]
   }
 ];

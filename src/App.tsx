@@ -248,7 +248,37 @@ export default function App() {
     return Math.round((completedSteps.size / steps.length) * 100);
   }, [completedSteps.size, steps.length]);
 
-  const handleNext = () => {
+  const handleNext = async () => {
+    const stepId = currentStep.id;
+    const userId = currentUser ? currentUser.id : 'guest-user';
+
+    // 1. Mark current milestone as completed
+    setCompletedSteps(prev => {
+      const newSet = new Set(prev);
+      newSet.add(stepId);
+      return newSet;
+    });
+    saveStepProgress(userId, currentEvent.id, stepId, 'completed').catch(err => {
+      console.warn('Failed to save step completion on next:', err);
+    });
+
+    // 2. Automatically cross off all checklist tasks of current milestone
+    if (currentStep.tasks && currentStep.tasks.length > 0) {
+      const taskIds = currentStep.tasks.map(t => t.id);
+      setCompletedTaskIds(prev => {
+        const newSet = new Set(prev);
+        taskIds.forEach(tid => newSet.add(tid));
+        return newSet;
+      });
+
+      taskIds.forEach(tid => {
+        saveTaskProgress(userId, tid, true).catch(err => {
+          console.warn('Failed to save task completion on next:', err);
+        });
+      });
+    }
+
+    // 3. Navigate to next step
     if (currentStepIndex < steps.length - 1) {
       setCurrentStepId(steps[currentStepIndex + 1].id);
     }
@@ -279,7 +309,37 @@ export default function App() {
       return newSet;
     });
 
+    const targetStep = steps.find(s => s.id === id);
     const userId = currentUser ? currentUser.id : 'guest-user';
+
+    if (targetStep?.tasks && targetStep.tasks.length > 0) {
+      const taskIds = targetStep.tasks.map(t => t.id);
+
+      if (!isCurrentlyDone) {
+        // Marking step complete -> automatically cross off all checklist items
+        setCompletedTaskIds(prev => {
+          const newSet = new Set(prev);
+          taskIds.forEach(tid => newSet.add(tid));
+          return newSet;
+        });
+
+        taskIds.forEach(tid => {
+          saveTaskProgress(userId, tid, true).catch(() => {});
+        });
+      } else {
+        // Reversing completion -> automatically uncross / uncheck all checklist items
+        setCompletedTaskIds(prev => {
+          const newSet = new Set(prev);
+          taskIds.forEach(tid => newSet.delete(tid));
+          return newSet;
+        });
+
+        taskIds.forEach(tid => {
+          saveTaskProgress(userId, tid, false).catch(() => {});
+        });
+      }
+    }
+
     await saveStepProgress(userId, currentEvent.id, id, newStatus);
   };
 

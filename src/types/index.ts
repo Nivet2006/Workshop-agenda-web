@@ -88,6 +88,8 @@ export interface StepContent {
   samplePostText?: string;
   sampleHeadline?: string;
   sampleAboutText?: string;
+  aboutPrompt?: string;
+  bannerPrompt?: string;
   aiPrompt?: string;
   aiPromptTitle?: string;
   eventImages?: Array<{ url: string; caption?: string }>;

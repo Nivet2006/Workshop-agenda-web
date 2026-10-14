@@ -181,6 +181,138 @@ interface StepViewerProps {
   fontScale?: number;
 }
 
+const DEFAULT_ABOUT_PROMPT = `1. Who you are: Introduce yourself and your current degree or role.
+2. Current focus: Mention your primary technical or domain interests.
+3. Projects & highlights: Briefly describe 1–2 practical projects, hackathons, or learning milestones.
+4. Non-technical strengths: Teamwork, problem-solving, community involvement.
+5. Career vision: What kind of engineering or professional challenges excite you.
+6. Call to action: Invite connections, mentorship, and collaboration.
+ask me these questions and build me a linkedin about section`;
+
+const DEFAULT_BANNER_PROMPT = `# Prompt: Premium Minimalist LinkedIn Profile Banner for a Software Engineer
+
+## Objective
+Design a premium, modern, highly professional LinkedIn profile banner that communicates my identity as a computer science engineering student, aspiring AI/ML engineer, and software developer. The banner should feel authentic, technically sophisticated, and carefully art-directed—not like a generic AI-generated template.
+
+## 1. Canvas and Technical Specifications
+- **Dimensions:** 1584 × 396 pixels.
+- **Aspect ratio:** 4:1 widescreen.
+- **Output:** High-resolution, crisp, professional banner optimized for LinkedIn.
+- Keep all essential content inside a central safe area, accounting for different desktop and mobile crops.
+- Maintain generous negative space and excellent readability at smaller display sizes.
+
+## 2. Visual Direction
+Create an understated, premium technology aesthetic inspired by Linear, Apple, Swiss editorial design, and contemporary developer portfolios.
+
+The design should communicate:
+- Technical competence
+- Curiosity and continuous learning
+- Software engineering and AI innovation
+- A builder's mindset
+- Professional ambition without exaggeration
+
+Avoid the stereotypical futuristic AI aesthetic. Do not use excessive gradients, neon effects, glowing particles, holograms, stock imagery, or crowded technology illustrations.
+
+## 3. Color Palette
+Use a restrained, cohesive palette:
+- Background: Near-black \`#0A0A0A\` or deep charcoal \`#111111\`.
+- Primary text: White \`#FFFFFF\`.
+- Secondary text: Muted gray \`#A1A1AA\`.
+- Accent: Restrained electric blue \`#60A5FA\`, used sparingly.
+- Optional dividers and technical details: \`#27272A\`.
+
+Prefer solid colors and subtle tonal variation. Do not use strong gradients, ambient glows, glassmorphism, or decorative textures.
+
+## 4. Layout and Composition
+
+### Left section — Clear negative space
+Keep the leftmost portion visually quiet because LinkedIn's circular profile photograph overlaps this region.
+
+- No headline, important text, logo, or essential visual element in the bottom-left area.
+- Avoid important details near the left edge.
+- Allow the background to continue naturally behind the profile-picture overlap.
+- Keep this region clean on both desktop and mobile layouts.
+
+### Center-right section — Main identity
+Place the main content toward the center-right, using a precise alignment grid.
+
+Main headline:
+**BUILDING TECHNOLOGY THAT MATTERS.**
+
+Supporting line:
+**AI / ML · Software Engineering · Web Development**
+
+Typography should be modern, clean, and confident. Use a contemporary sans-serif typeface similar to Inter, Geist, or SF Pro.
+
+- Headline: Medium to bold weight, with controlled letter spacing.
+- Supporting line: Smaller, muted gray typography.
+- Maintain a clear hierarchy without oversized, aggressive lettering.
+
+### Right section — Technical visual language
+Introduce a small, sophisticated technical motif that reinforces the engineering theme.
+
+Possible elements:
+- Fine geometric lines and modular grid structures.
+- Minimal node-and-connection diagrams.
+- Abstract representations of data flow or system architecture.
+- Tiny, understated terminal-inspired details.
+- A few precisely aligned dots or thin technical dividers.
+
+Keep these elements subtle and secondary to the text. They should feel intentionally designed rather than randomly generated.
+
+## 5. Personalized Content
+Use the following identity and professional direction as the basis for the design:
+
+- **Name:** Nived Shaji
+- **Role:** Computer Science Engineering Student
+- **Professional direction:** Aspiring AI/ML Engineer and Software Developer
+- **Interests:** Artificial Intelligence, Machine Learning, Web Engineering, Backend Development, and Building Useful Technology.
+
+If the name is included, display it discreetly. The banner should complement the LinkedIn profile rather than repeat an entire résumé.
+
+Optional portfolio reference:
+\`nivet2006.in\`
+
+Include the portfolio URL only if it can be rendered accurately and legibly. Do not invent additional credentials, job titles, company affiliations, achievements, or certification claims.
+
+## 6. Typography and Text Rendering
+Use a maximum of two font styles and a strict typographic hierarchy.
+
+- Keep text sharp, aligned, and professionally spaced.
+- Avoid decorative, futuristic, handwritten, or excessively condensed fonts.
+- Render all text exactly as supplied.
+- Preserve punctuation and capitalization.
+- Do not introduce random letters, fake code, misspelled words, or illegible microtext.
+- Do not add unnecessary slogans or multiple competing headlines.
+
+## 7. Overall Design Quality
+The finished banner should look like a custom-designed personal brand asset created by a skilled graphic designer.
+
+It should be:
+- Minimal yet distinctive.
+- Technical without looking cluttered.
+- Modern without relying on visual effects.
+- Professional without feeling corporate or generic.
+- Consistent with a clean developer portfolio and professional headshot.
+
+Use spacing, alignment, typography, and contrast—not decorative effects—to create visual impact.
+
+## 8. Strict Negative Instructions
+Do not include:
+- The circular profile photograph or any additional human portraits.
+- Large logos or unofficial brand marks.
+- Random programming symbols, code screenshots, or meaningless terminal text.
+- Multiple technology icons scattered across the banner.
+- Stock photographs, office scenes, robots, circuit-board backgrounds, or AI brains.
+- Neon lighting, strong gradients, glow effects, lens flares, or 3D elements.
+- Excessive colors, decorative borders, visual clutter, or unnecessary labels.
+- Claims of professional experience, expertise, or achievements that have not been supplied.
+
+## Final Quality Standard
+Produce one finished LinkedIn banner at exactly 1584 × 396 pixels, with a clean near-black background, restrained white typography, subtle engineering-inspired details, and carefully balanced negative space.
+
+The final result should establish a recognizable personal brand for Nived Shaji: a computer science student focused on AI/ML and software engineering who enjoys building meaningful technology. It must feel intentional, understated, technically credible, and visually consistent with a premium developer portfolio.`;
+
 export function StepViewer({ 
   step, 
   totalSteps,
@@ -206,10 +338,21 @@ export function StepViewer({
     return analyzeLinkedInUrl(submissionUrl, step.content?.submissionKey, step.position);
   }, [submissionUrl, step.content?.submissionKey, step.position]);
 
-  const isUrlSubmissionStep = Boolean(
-    step.content?.submissionType === 'url' || 
-    [2, 10, 11].includes(step.position) ||
-    ['li-step-02', 'li-step-10', 'li-step-11'].includes(step.id)
+  // User requirement: "hide all Test & Verify every section what ever present"
+  const isUrlSubmissionStep = false;
+
+  const isBannerStep = Boolean(
+    step.content?.bannerPrompt ||
+    step.id === 'li-step-05' ||
+    step.position === 5 ||
+    step.title.toLowerCase().includes('banner')
+  );
+
+  const isAboutStep = Boolean(
+    step.content?.aboutPrompt || 
+    step.id === 'li-step-06' || 
+    step.position === 6 || 
+    step.title.toLowerCase().includes('about')
   );
 
   const isNetworkingStep = Boolean(
@@ -309,7 +452,7 @@ export function StepViewer({
     );
 
     const submissionLabel = step.content?.submissionLabel || (
-      step.position === 2 ? 'Test & Verify: Paste your custom profile URL below' :
+      step.position === 2 ? 'Paste your custom profile URL below' :
       step.position === 10 ? 'Submit Your Published LinkedIn Post URL' :
       step.position === 11 ? 'Submit Your Final Profile URL for Review' : 'Submit URL'
     );
@@ -432,7 +575,11 @@ export function StepViewer({
                 <h1 className="font-serif text-4xl sm:text-5xl md:text-6xl text-white tracking-tight leading-[1.08] font-normal">
                   {step.title.replace(/^Step\s*\d+\s*[—–-]\s*/i, '')}
                 </h1>
-                {step.summary && !isNetworkingStep && (
+                {isNetworkingStep ? (
+                  <p className="mt-3 text-sm md:text-base text-[#A1A1A1] font-normal leading-relaxed max-w-2xl font-sans">
+                    Click on any QR code or scan it with your phone to redirect directly to the LinkedIn profile.
+                  </p>
+                ) : step.summary && (
                   <p className="mt-3 text-base md:text-lg text-[#A1A1A1] font-normal leading-relaxed max-w-2xl font-sans">
                     {step.summary}
                   </p>
@@ -479,6 +626,90 @@ export function StepViewer({
               <div className="p-3 bg-[#0A0A0A] border border-[#1B1B1B] rounded-[4px] text-xs font-mono text-[#D4D4D4] leading-relaxed">
                 {step.content.sampleHeadline}
               </div>
+            </div>
+          )}
+
+          {/* AI Banner Prompt Helper (Step 5: Custom Banner Design and Upload) - Prompt text NOT displayed on screen per user requirement */}
+          {isBannerStep && (
+            <div className="my-8 p-5 sm:p-6 rounded-md bg-[#111111] border border-[#242424] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-[4px] bg-[#161616] border border-[#242424] flex items-center justify-center text-[#FF5722] shrink-0">
+                  <Sparkles size={16} />
+                </div>
+                <div>
+                  <h4 className="font-mono text-xs uppercase tracking-widest text-white">
+                    Custom Banner AI Prompt
+                  </h4>
+                  <p className="text-xs text-[#888888] font-sans mt-0.5">
+                    Click to copy the 1584×396 minimalist software engineer banner prompt for ChatGPT, Midjourney, or Claude.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => copyToClipboard(step.content?.bannerPrompt || DEFAULT_BANNER_PROMPT, 'banner-prompt')}
+                className={clsx(
+                  "flex items-center justify-center gap-2 px-5 py-2.5 rounded-md font-medium text-xs font-mono transition-all duration-200 shrink-0",
+                  copiedField === 'banner-prompt'
+                    ? "bg-[#14B8A6] text-black"
+                    : "bg-[#FF5722] hover:bg-[#E64A19] text-white shadow-sm"
+                )}
+                title="Click to copy the AI Banner Prompt to clipboard"
+              >
+                {copiedField === 'banner-prompt' ? (
+                  <>
+                    <Check size={14} className="stroke-[2.5]" />
+                    <span>Copied to Clipboard!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy size={14} />
+                    <span>Copy AI prompt</span>
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* AI About Section Builder Prompt (Copy Prompt Button - Prompt text NOT displayed on screen per user requirement) */}
+          {isAboutStep && (
+            <div className="my-8 p-5 sm:p-6 rounded-md bg-[#111111] border border-[#242424] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-[4px] bg-[#161616] border border-[#242424] flex items-center justify-center text-[#FF5722] shrink-0">
+                  <Sparkles size={16} />
+                </div>
+                <div>
+                  <h4 className="font-mono text-xs uppercase tracking-widest text-white">
+                    About Section Prompt
+                  </h4>
+                  <p className="text-xs text-[#888888] font-sans mt-0.5">
+                    Click to copy the 6-question prompt. Paste into ChatGPT or Claude to build your LinkedIn About section.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => copyToClipboard(step.content?.aboutPrompt || DEFAULT_ABOUT_PROMPT, 'about-prompt')}
+                className={clsx(
+                  "flex items-center justify-center gap-2 px-5 py-2.5 rounded-md font-medium text-xs font-mono transition-all duration-200 shrink-0",
+                  copiedField === 'about-prompt'
+                    ? "bg-[#14B8A6] text-black"
+                    : "bg-[#FF5722] hover:bg-[#E64A19] text-white shadow-sm"
+                )}
+                title="Click to copy the About Section prompt to clipboard"
+              >
+                {copiedField === 'about-prompt' ? (
+                  <>
+                    <Check size={14} className="stroke-[2.5]" />
+                    <span>Copied to Clipboard!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy size={14} />
+                    <span>Copy Prompt</span>
+                  </>
+                )}
+              </button>
             </div>
           )}
 
@@ -893,10 +1124,10 @@ export function StepViewer({
 
             <button
               onClick={onNext}
-              disabled={isLast}
+              disabled={isLast && isCompleted}
               className="flex items-center gap-2 text-xs font-medium bg-[#FF5722] hover:bg-[#E64A19] text-white disabled:opacity-30 disabled:hover:bg-[#FF5722] transition-colors px-4 sm:px-5 py-2 sm:py-2.5 rounded-md shrink-0"
             >
-              <span>{isLast ? "All Milestones Completed" : "Next Milestone"}</span>
+              <span>{isLast ? (isCompleted ? "All Milestones Completed" : "Complete Milestone") : "Next Milestone"}</span>
               <ChevronRight size={15} />
             </button>
           </div>
